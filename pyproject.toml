@@ -8,7 +8,6 @@ dependencies = [
     "chromadb>=1.5.8",
     "duckduckgo-search>=8.1.1",
     "ebooklib>=0.20",
-    "ebooklib>=0.20",
     "hatchling>=1.29.0",
     "markdown>=3.10.2",
     "openai>=2.32.0",

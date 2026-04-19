@@ -1,0 +1,12 @@
+services:
+  studycraft:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./output:/app/output
+      - ./uploads:/app/uploads
+      - ./rag_index:/app/rag_index
+    restart: unless-stopped
