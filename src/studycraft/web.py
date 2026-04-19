@@ -140,6 +140,11 @@ _HTML = """<!DOCTYPE html>
     <label for="subject-input">Subject name (optional — auto-detected if blank)</label>
     <input type="text" id="subject-input" placeholder="e.g. Advanced Java, Calculus II, History of Art">
 
+    <label for="answers-check" style="display:inline-flex;align-items:center;gap:.5rem;margin-bottom:1rem;cursor:pointer">
+      <input type="checkbox" id="answers-check" style="width:1.1rem;height:1.1rem">
+      Generate answer key
+    </label>
+
     <label for="model-select">Model</label>
     <select id="model-select">
       <option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B (Free · Fast)</option>
@@ -207,6 +212,7 @@ _HTML = """<!DOCTYPE html>
     form.append('file', selectedFile);
     form.append('subject', document.getElementById('subject-input').value);
     form.append('model', document.getElementById('model-select').value);
+    form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
 
     let jobId;
     try {
@@ -280,6 +286,7 @@ def create_app() -> "FastAPI":  # type: ignore
         file: UploadFile = File(...),
         subject: str = Form(""),
         model: str = Form("meta-llama/llama-3.1-8b-instruct:free"),
+        with_answers: str = Form(""),
     ):
         api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
         if not api_key:
@@ -301,7 +308,7 @@ def create_app() -> "FastAPI":  # type: ignore
             "files": {},
         }
         background_tasks.add_task(
-            _run_job, job_id, save_path, subject or None, model, api_key
+            _run_job, job_id, save_path, subject or None, model, api_key, bool(with_answers)
         )
         return JSONResponse({"job_id": job_id})
 
@@ -311,6 +318,14 @@ def create_app() -> "FastAPI":  # type: ignore
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         return JSONResponse(job)
+
+    @app.get("/api/jobs")
+    async def list_jobs():
+        """List all jobs with their status."""
+        return JSONResponse({
+            jid: {"status": j["status"], "progress": j["progress"], "message": j["message"]}
+            for jid, j in _jobs.items()
+        })
 
     @app.get("/api/download/{job_id}/{fmt}")
     async def download(job_id: str, fmt: str):
@@ -323,7 +338,8 @@ def create_app() -> "FastAPI":  # type: ignore
 
 
 async def _run_job(
-    job_id: str, doc_path: Path, subject: str | None, model: str, api_key: str
+    job_id: str, doc_path: Path, subject: str | None, model: str, api_key: str,
+    with_answers: bool = False,
 ):
     """Background job that runs StudyCraft and updates _jobs[job_id]."""
     try:
@@ -342,7 +358,8 @@ async def _run_job(
         )
 
         paths = craft.run(
-            document_path=doc_path, subject=subject, on_progress=_on_progress
+            document_path=doc_path, subject=subject, on_progress=_on_progress,
+            with_answers=with_answers,
         )
 
         _jobs[job_id].update(

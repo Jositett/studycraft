@@ -2,6 +2,22 @@
 
 All notable changes to StudyCraft will be documented in this file.
 
+## [0.3.0] — 2025-01-20
+
+### Added
+- Subject-type detection in `template.py` — classifies subjects as STEM, math, language, or humanities
+- Format-specific example hints injected into LLM prompt per subject type
+- XML-tagged prompt structure in `engine.py` for stricter LLM compliance
+- Answer key checkbox in web UI form
+- `GET /api/jobs` endpoint for listing all jobs
+- Test suite: 39 tests across 5 modules (loader, detector, validator, export, template)
+- `tests/` directory with `test_loader.py`, `test_detector.py`, `test_validator.py`, `test_export.py`, `test_template.py`
+
+### Changed
+- `engine.py` — prompt now uses XML tags (`<subject>`, `<document_context>`, `<rules>`, etc.)
+- `template.py` — now exports `detect_subject_type()` and `example_format_hint()`
+- `web.py` — generate endpoint accepts `with_answers` form field; added `/api/jobs`
+
 ## [0.2.0] — 2025-01-20
 
 ### Added

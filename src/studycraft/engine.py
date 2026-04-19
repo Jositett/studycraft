@@ -26,7 +26,7 @@ from .loader import load_document
 from .detector import detect_chapters, chapters_to_outline, Chapter
 from .rag import RAGIndex
 from .researcher import research
-from .template import CHAPTER_TEMPLATE
+from .template import CHAPTER_TEMPLATE, detect_subject_type, example_format_hint
 from .validator import validate_chapter
 
 console = Console()
@@ -217,6 +217,10 @@ class StudyCraft:
             subchapter_titles=sub_titles,
         )
 
+        # Subject-type detection for format hints
+        subject_type = detect_subject_type(subject)
+        format_hint = example_format_hint(subject_type)
+
         # Fill template
         filled_template = (
             CHAPTER_TEMPLATE.replace("{chapter_num}", chapter["num"])
@@ -225,34 +229,45 @@ class StudyCraft:
             .replace("{subchapters}", sub_label)
         )
 
-        prompt = f"""You are an expert educator and technical writer. \
-Generate a complete, high-quality practice guide chapter using EXACTLY the template below.
+        prompt = f"""You are an expert educator and technical writer.
+Generate a complete, high-quality practice guide chapter.
 Fill every placeholder with accurate, practical, subject-specific content.
 Do NOT add, remove, or rename any section. Do NOT output anything outside the template.
 
-SUBJECT: {subject}
-CHAPTER: {chapter["num"]} — {chapter["title"]}
-SUBCHAPTERS: {sub_label}
+<subject>{subject}</subject>
+<subject_type>{subject_type}</subject_type>
+<chapter_number>{chapter["num"]}</chapter_number>
+<chapter_title>{chapter["title"]}</chapter_title>
+<subchapters>{sub_label}</subchapters>
 
-DOCUMENT CONTEXT (from the uploaded resource):
+<document_context>
 {chapter["text"][:3000]}
+</document_context>
 
-RAG CONTEXT (most relevant document passages):
+<rag_context>
 {rag_ctx}
+</rag_context>
 
-WEB RESEARCH CONTEXT:
+<web_research>
 {web_ctx}
+</web_research>
 
-TEMPLATE (fill every placeholder — replace all [...] items with real content):
+<format_instructions>
+{format_hint}
+</format_instructions>
+
+<template>
 {filled_template}
+</template>
 
-RULES:
+<rules>
 - Use the exact subject "{subject}" throughout — no generic placeholders
-- Code/formulas must match the subject (e.g. Python for a Python course, equations for maths)
+- Examples must use the format described in format_instructions
 - All 10 quiz questions must be filled in with real questions
 - Keep examples practical and realistic, not toy/trivial examples
 - Do not reproduce the placeholder text — replace it entirely
-"""
+- Output ONLY the filled template, nothing else
+</rules>"""
 
         try:
             resp = self.client.chat.completions.create(

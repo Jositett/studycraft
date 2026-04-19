@@ -6,7 +6,49 @@ Placeholders:
   {chapter_title}   — full chapter title
   {subject}         — overall subject / course name
   {subchapters}     — bulleted list of subchapter titles (or "None detected")
+  {example_format}  — subject-specific format hint (code, equations, prose, etc.)
 """
+
+from __future__ import annotations
+
+import re
+
+# ── Subject type detection ────────────────────────────────────────────────────
+
+_STEM_KEYWORDS = re.compile(
+    r"(?i)\b(python|java|javascript|typescript|c\+\+|rust|go|ruby|php|swift|kotlin|"
+    r"programming|software|algorithm|data.?struct|machine.?learn|deep.?learn|"
+    r"web.?dev|devops|docker|kubernetes|sql|database|api|html|css|react|node)"
+)
+_MATH_KEYWORDS = re.compile(
+    r"(?i)\b(math|calculus|algebra|geometry|statistics|probability|linear|"
+    r"differential|integral|trigonometry|discrete|number.?theory|physics|chemistry)"
+)
+_LANGUAGE_KEYWORDS = re.compile(
+    r"(?i)\b(english|spanish|french|german|japanese|chinese|korean|arabic|"
+    r"grammar|vocabulary|linguistics|language.?learn|esl|toefl|ielts)"
+)
+
+
+def detect_subject_type(subject: str) -> str:
+    """Classify subject into stem, math, language, or humanities."""
+    if _STEM_KEYWORDS.search(subject):
+        return "stem"
+    if _MATH_KEYWORDS.search(subject):
+        return "math"
+    if _LANGUAGE_KEYWORDS.search(subject):
+        return "language"
+    return "humanities"
+
+
+def example_format_hint(subject_type: str) -> str:
+    """Return a format hint for worked examples based on subject type."""
+    return {
+        "stem": "Use code blocks with the appropriate programming language. Show input/output.",
+        "math": "Use LaTeX-style equations and step-by-step algebraic manipulation.",
+        "language": "Use vocabulary tables, sentence examples, and translation exercises.",
+        "humanities": "Use prose analysis, source excerpts, and argumentative examples.",
+    }.get(subject_type, "Use the most appropriate format for the subject.")
 
 CHAPTER_TEMPLATE = """\
 # 📖 Practice Guide — {subject}

@@ -1,64 +1,53 @@
 # Task Tracker
 
-## Current Sprint — v0.2.0
+## Current Sprint — v0.4.0
 
-### Phase 3.1 — Output Validation
+### Phase 2.2 — Multi-file Support
+- [ ] Allow uploading supplementary PDFs merged into RAG
+- [ ] "Add context files" button in web UI
 
-- [x] `validator.py` — check generated chapters for required sections, examples, quiz questions, unfilled placeholders
-- [x] Auto-retry on validation failure (different temperature)
-- [x] `studycraft validate <guide.md>` CLI command
+### Phase 2.3 — Persistent Job Store
+- [ ] Replace in-memory `_jobs` dict with SQLite
+- [ ] Job history page
+- [ ] Auto-cleanup of old jobs after 24h
 
-### Phase 2.1 — Web UI Real-time Progress
-
-- [x] Add progress callback to engine so callers get chapter-level updates
-- [x] Wire callback into web `_jobs` dict for per-chapter progress
-- [x] Show "Generating chapter N of M…" in browser
-
-### Phase 3.3 — Answer Key Generation
-
-- [x] Second LLM pass to produce `Answer_Key.md` with quiz answers + exercise solutions
-- [x] `--with-answers` flag on `generate` command
-- [ ] Include answer key in web UI output
+### Phase 4.1 — Better Chapter Detection
+- [ ] LLM-based TOC extraction fallback
+- [ ] Non-Western chapter markers (Roman numerals, etc.)
+- [ ] Appendix/glossary detection
 
 ---
 
 ## Backlog
 
-### Phase 2.2 — Multi-file Support
+### Phase 4.2 — Richer RAG
+- [ ] Benchmark `all-mpnet-base-v2` vs `all-MiniLM-L6-v2`
+- [ ] Store chunk metadata: chapter number, page number, source file
+- [ ] `studycraft inspect --rag` — show RAG chunks per chapter
 
-- [ ] Allow uploading supplementary PDFs merged into RAG
-- [ ] "Add context files" button in web UI
+### Phase 5.1 — Additional Export Formats
+- [ ] DOCX export (python-docx)
+- [ ] EPUB export
+- [ ] Anki flashcard deck (.apkg)
 
-### Phase 2.3 — Persistent Job Store
-
-- [ ] Replace in-memory `_jobs` dict with SQLite
-- [ ] Job history page
-- [ ] Auto-cleanup of old jobs after 24h
-
-### Phase 3.2 — Smarter Prompting
-
-- [ ] Few-shot example chapter prefix
-- [ ] XML-tagged sections for stricter compliance
-- [ ] Per-subject prompt tuning (STEM vs humanities vs language)
-
-### Phase 4.1 — Better Chapter Detection
-
-- [ ] LLM-based TOC extraction fallback
-- [ ] Non-Western chapter markers
-- [ ] Appendix/glossary detection
-
-### Phase 6.3 — Test Suite
-
-- [ ] `tests/test_loader.py`
-- [ ] `tests/test_detector.py`
-- [ ] `tests/test_export.py`
+### Phase 6.1 — Parallel Generation
+- [ ] `asyncio.gather` for concurrent chapter generation
+- [ ] Token budget manager
+- [ ] `--workers N` flag
 
 ---
 
 ## Completed
 
-### v0.2.0 — Validation, Progress & Answer Keys ✅
+### v0.3.0 — Smarter Prompting, Tests & API ✅
+- [x] XML-tagged prompt sections for stricter LLM compliance
+- [x] Subject-type detection (STEM/math/language/humanities)
+- [x] Format-specific example hints per subject type
+- [x] Answer key checkbox wired into web UI
+- [x] `GET /api/jobs` endpoint for job listing
+- [x] Test suite: 39 tests across loader, detector, validator, export, template
 
+### v0.2.0 — Validation, Progress & Answer Keys ✅
 - [x] Output validator with 4 checks (sections, examples, quiz, placeholders)
 - [x] Auto-retry on validation failure (higher temperature)
 - [x] `studycraft validate` CLI command
@@ -67,7 +56,6 @@
 - [x] Answer key generation via `--with-answers` flag
 
 ### v0.1.0 — Core Pipeline ✅
-
 - [x] Document loader (PDF, DOCX, TXT, MD, RTF)
 - [x] Chapter + subchapter detection (3 strategies)
 - [x] RAG index (ChromaDB + MiniLM)
