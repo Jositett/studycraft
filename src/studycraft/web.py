@@ -239,7 +239,7 @@ _HTML = """<!DOCTYPE html>
 <div class="page-layout">
 <main>
   <div class="card key-card" id="key-card" style="display:none">
-    <h2>\ud83d\udd11 API Keys</h2>
+    <h2>\U0001f511 API Keys</h2>
     <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">Keys are stored in your browser only and never saved on the server.</p>
 
     <div class="key-field">
