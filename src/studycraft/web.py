@@ -486,7 +486,7 @@ def create_app() -> "FastAPI":  # type: ignore
 
     from .jobstore import JobStore
 
-    app = FastAPI(title="StudyCraft", version="0.7.0")
+    app = FastAPI(title="StudyCraft", version="0.8.0")
     store = JobStore(db_path=OUTPUT_DIR / "jobs.db")
 
     @app.get("/favicon.svg")

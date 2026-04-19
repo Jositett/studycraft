@@ -2,6 +2,29 @@
 
 All notable changes to StudyCraft will be documented in this file.
 
+## [0.8.0] — 2025-01-21
+
+### Added
+- Theme system with 9 built-in themes: dark (default), light, nord, solarized, dracula, github, monokai, ocean, rosé-pine
+- `themes.py` — `Theme` dataclass with 30+ color tokens, `get_theme()` / `list_themes()` API
+- All export formats (HTML, PDF, DOCX, EPUB) now use theme-driven colors via dependency injection
+- Table of Contents with navigation in all export formats:
+  - HTML: sticky sidebar TOC with scroll-spy highlighting
+  - PDF: cover page + TOC page with indented chapter listing
+  - Markdown: TOC block with anchor links at top
+  - DOCX: Word TOC field (auto-updates on open)
+- `--theme` / `-t` CLI flag for generation and export
+- Theme dropdown in web UI
+- Themed code blocks, blockquotes, tables, headings, and cover across all formats
+
+### Changed
+- `export.py` — CSS now generated from theme instead of hardcoded; accepts `theme` param
+- `export_docx.py` — heading/quote colors from theme
+- `export_epub.py` — CSS generated from theme
+- `engine.py` — `run()` accepts `theme` param, passes to export pipeline
+- Dark mode default with proper contrast for HTML exports (cover, headings, code)
+- 53 tests passing
+
 ## [0.7.0] — 2025-01-21
 
 ### Added

@@ -1,6 +1,6 @@
 [project]
 name = "studycraft"
-version = "0.7.0"
+version = "0.8.0"
 description = "Craft structured, research-backed practice guides from any document — PDF, DOCX, TXT, RTF, EPUB, MD"
 readme = "README.md"
 requires-python = ">=3.12"

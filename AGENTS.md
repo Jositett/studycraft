@@ -20,6 +20,7 @@ uv run studycraft models --free --vision # List free vision models
 -m, --model <id>         # Specify OpenRouter model (default: openrouter/free)
 -x, --context "extra.pdf" # Add supplementary RAG context files
 -w, --workers 3          # Parallel generation
+-t, --theme "dracula"     # Export theme (dark, light, nord, solarized, dracula, github, monokai, ocean, rose-pine)
 --with-answers           # Generate answer key
 --clear-cache            # Delete cached chapters
 --rate-limit 5           # Seconds between chapters (default: 5)
@@ -38,19 +39,20 @@ Set `OPENROUTER_API_KEY` (or `STUDYCRAFT_API_KEY`) in `.env`. Get free key at <h
 uv run python scripts/ci.py              # Full CI: lint + test + build
 uv run python scripts/ci.py --lint       # Lint only
 uv run python scripts/ci.py --test       # Test only
-uv run python scripts/release.py 0.7.0   # CI + bump version + tag + build
+uv run python scripts/release.py 0.8.0   # CI + bump version + tag + build
 ```
 
 ## Architecture
 
 - Entry point: `src/studycraft/cli.py` -- no args launches web UI
 - Engine: `engine.py` -- orchestrates load -> detect -> RAG -> research -> generate -> export
-- Document loading: `loader.py` -- PDF, DOCX, TXT, MD, RTF
+- Document loading: `loader.py` -- PDF, DOCX, TXT, MD, RTF, EPUB
 - Chapter detection: `detector.py` -- numbered, Roman numeral, ALL-CAPS, fixed-window fallback
 - RAG: `rag.py` -- ChromaDB + sentence-transformers with chunk metadata
 - Web research: `researcher.py` -- DuckDuckGo per chapter
 - Validation: `validator.py` -- checks sections, examples, quiz, placeholders
-- Export: `export.py` + `export_docx.py` + `export_epub.py` -- MD, HTML, PDF, DOCX, EPUB
+- Themes: `themes.py` -- 9 themes (dark, light, nord, solarized, dracula, github, monokai, ocean, rose-pine)
+- Export: `export.py` + `export_docx.py` + `export_epub.py` -- MD, HTML, PDF, DOCX, EPUB (all themed + TOC)
 - Models: `model_registry.py` -- fetches from OpenRouter API, caches to ~/.studycraft/models.json
 - Job store: `jobstore.py` -- SQLite-backed persistent job tracking
 - Web UI: `web.py` -- FastAPI + inline HTML

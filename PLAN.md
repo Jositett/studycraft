@@ -1,19 +1,21 @@
 # 🗺️ StudyCraft — Development Plan
 
-## Status: v0.1.0 — Core Pipeline ✅
+## Status: v0.8.0 — Theme System + TOC Navigation ✅
 
 ### What's working
-- ✅ Universal document loader (PDF, DOCX, TXT, MD, RTF)
+- ✅ Universal document loader (PDF, DOCX, TXT, MD, RTF, EPUB)
 - ✅ Auto chapter + subchapter detection (3 strategies with fallback)
 - ✅ RAG index (ChromaDB + MiniLM) — clears between documents
 - ✅ Subject-aware web research (DuckDuckGo, multi-query per chapter)
 - ✅ Universal practice guide template (8 sections, subject-agnostic)
 - ✅ LLM generation via OpenRouter (any model, configurable)
 - ✅ Per-chapter cache + `--resume-from` crash recovery
-- ✅ Export pipeline: Markdown → styled HTML → PDF
-- ✅ Typer CLI with Rich output and progress bars
-- ✅ Web UI scaffold (FastAPI + drag-and-drop, background jobs, polling)
-- ✅ `uv`-managed project with editable install + optional web deps
+- ✅ Export pipeline: MD → HTML → PDF → DOCX → EPUB (all with TOC)
+- ✅ 9 built-in themes (dark, light, nord, solarized, dracula, github, monokai, ocean, rosé-pine)
+- ✅ Typer CLI with Rich output, progress bars, and `--theme` flag
+- ✅ Web UI (dark mode, dynamic models, theme selector, time estimates)
+- ✅ 429 rate-limit retry with exponential backoff
+- ✅ `uv`-managed project with editable install
 
 ---
 
@@ -136,11 +138,9 @@
 
 | Issue | Workaround |
 |-------|-----------|
-| `weasyprint` needs GTK on Windows | Chrome → Ctrl+P → Save as PDF |
 | Free LLM models may leave `[...]` placeholders unfilled | Use `--model meta-llama/llama-3.3-70b-instruct:free` or a paid model |
 | Scanned PDF pages (image-only) yield no text | Use a PDF with a text layer; OCR support coming in Phase 4 |
-| Web UI progress has only 2 update points | Phase 2.1 will wire per-chapter events |
-| In-memory job store resets on server restart | Phase 2.3 will switch to SQLite |
+| `embeddings.position_ids UNEXPECTED` log | Harmless — known upstream issue in sentence-transformers, model works fine |
 
 ---
 
@@ -150,14 +150,20 @@
 studycraft/
 ├── src/studycraft/
 │   ├── __init__.py       — Package entry, exposes StudyCraft
-│   ├── cli.py            — Typer CLI: generate, inspect, export, models
+│   ├── cli.py            — Typer CLI: generate, inspect, export, validate, models, gist
 │   ├── engine.py         — Core orchestrator (StudyCraft class)
-│   ├── loader.py         — Document loader: PDF, DOCX, TXT, MD, RTF
+│   ├── loader.py         — Document loader: PDF, DOCX, TXT, MD, RTF, EPUB
 │   ├── detector.py       — Chapter + subchapter auto-detection
 │   ├── rag.py            — ChromaDB RAG index
 │   ├── researcher.py     — DuckDuckGo web research
 │   ├── template.py       — Universal 8-section practice guide template
-│   ├── export.py         — MD → styled HTML → PDF export pipeline
+│   ├── themes.py         — Theme registry (9 themes, Theme dataclass)
+│   ├── validator.py      — Output validation (sections, examples, quiz, placeholders)
+│   ├── export.py         — MD → HTML → PDF export with TOC + themes
+│   ├── export_docx.py    — DOCX export with TOC + themes
+│   ├── export_epub.py    — EPUB export with TOC + themes
+│   ├── model_registry.py — OpenRouter model fetcher + cache
+│   ├── jobstore.py       — SQLite-backed persistent job tracking
 │   └── web.py            — FastAPI web UI + background job runner
 ├── pyproject.toml        — uv/hatch config, deps, entry points
 ├── .env.example          — API key template

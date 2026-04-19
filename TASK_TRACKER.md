@@ -20,6 +20,27 @@
 
 ## Completed
 
+### v0.8.0 — Theme System + TOC Navigation ✅
+
+- [x] `themes.py` with Theme dataclass and 9 themes (dark, light, nord, solarized, dracula, github, monokai, ocean, rosé-pine)
+- [x] All exports (HTML, PDF, DOCX, EPUB) use theme-driven colors via dependency injection
+- [x] TOC with navigation in all formats (HTML sidebar, PDF TOC page, MD anchors, DOCX Word TOC field)
+- [x] `--theme` / `-t` CLI flag + web UI theme dropdown
+- [x] Dark mode default with proper contrast for HTML exports
+- [x] 53 tests passing
+
+### v0.7.0 — EPUB Upload, Dark Mode UI, Bug Fixes ✅
+
+- [x] EPUB file upload support (loader + web UI + CLI)
+- [x] Dark mode web UI with improved UX (scrollbar, aside guide, time estimates)
+- [x] Dynamic model selection from OpenRouter API with refresh button
+- [x] Favicon, "Generate another" button, file-selected drop zone state
+- [x] Replaced weasyprint (GTK) with fpdf2 (pure Python) for PDF export
+- [x] Fixed researcher.py import: `ddgs` → `duckduckgo_search`
+- [x] 429 rate-limit retry with exponential backoff
+- [x] HF_TOKEN support in .env
+- [x] 53 tests passing
+
 ### v0.6.0 — EPUB, GitHub Actions, Gist Publish ✅
 
 - [x] EPUB export via `export_epub.py` (ebooklib) in pipeline
