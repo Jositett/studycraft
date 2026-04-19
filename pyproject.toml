@@ -23,6 +23,7 @@ dependencies = [
     "typer>=0.15.0",
     "uvicorn>=0.44.0",
     "fpdf2>=2.8.3",
+    "playwright>=1.52.0",
     "ddgs>=9.14.0",
 ]
 

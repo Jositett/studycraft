@@ -464,5 +464,23 @@ def models(
     )
 
 
+@app.command(name="setup-pdf")
+def setup_pdf() -> None:
+    """[bold]Install[/bold] Chromium browser for PDF export with emoji support."""
+    import subprocess
+
+    console.print("[cyan]Installing Chromium for PDF export...[/cyan]")
+    result = subprocess.run(
+        ["uv", "run", "playwright", "install", "chromium"],
+        capture_output=False,
+    )
+    if result.returncode == 0:
+        console.print("[green]\u2713 Chromium installed. PDF export is ready.[/green]")
+    else:
+        console.print(
+            "[yellow]\u26a0 Could not install Chromium. PDF will use fpdf2 fallback.[/yellow]"
+        )
+
+
 def main() -> None:
     app()

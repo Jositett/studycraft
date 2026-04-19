@@ -206,14 +206,21 @@ def export_all(
     # ── PDF ───────────────────────────────────────────────────────────────────
     pdf_path = output_dir / f"{base_name}.pdf"
     try:
-        _export_pdf(full_markdown, pdf_path, base_name, t)
+        _export_pdf_playwright(html_doc, pdf_path)
         console.print(f"[green]✓ PDF[/green]      → {pdf_path}")
         paths["pdf"] = pdf_path
-    except Exception as exc:
-        console.print(
-            f"[yellow]⚠ PDF skipped:[/yellow] {exc}\n"
-            "  Tip: open the HTML in Chrome → Ctrl+P → Save as PDF"
-        )
+    except Exception:
+        try:
+            _export_pdf(full_markdown, pdf_path, base_name, t)
+            console.print(
+                f"[green]✓ PDF[/green]      → {pdf_path} [dim](fpdf2 fallback)[/dim]"
+            )
+            paths["pdf"] = pdf_path
+        except Exception as exc:
+            console.print(
+                f"[yellow]⚠ PDF skipped:[/yellow] {exc}\n"
+                "  Tip: open the HTML in Chrome → Ctrl+P → Save as PDF"
+            )
 
     # ── DOCX ──────────────────────────────────────────────────────────────────
     try:
@@ -240,7 +247,34 @@ def export_all(
     return paths
 
 
-# ── PDF export ────────────────────────────────────────────────────────────────
+# ── PDF export (playwright) ────────────────────────────────────────────────────
+
+
+def _export_pdf_playwright(html_content: str, pdf_path: Path) -> None:
+    """Render HTML to PDF using headless Chromium (perfect emoji + CSS support)."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content(html_content, wait_until="networkidle")
+        # Hide the TOC sidebar for print
+        page.evaluate("""
+            const toc = document.querySelector('.toc-sidebar');
+            if (toc) toc.style.display = 'none';
+            const main = document.querySelector('.main-content');
+            if (main) main.style.marginLeft = '0';
+        """)
+        page.pdf(
+            path=str(pdf_path),
+            format="A4",
+            margin={"top": "20mm", "bottom": "20mm", "left": "15mm", "right": "15mm"},
+            print_background=True,
+        )
+        browser.close()
+
+
+# ── PDF export (fpdf2 fallback) ────────────────────────────────────────────────────────────────
 
 
 def _export_pdf(full_markdown: str, pdf_path: Path, base_name: str, t: Theme) -> None:
