@@ -349,29 +349,61 @@ def gist(
 
 
 @app.command()
-def models() -> None:
-    """[bold]List[/bold] recommended OpenRouter models for guide generation."""
-    table = Table(title="Recommended OpenRouter Models", show_lines=True)
-    table.add_column("Model ID", style="cyan")
-    table.add_column("Quality", style="green")
-    table.add_column("Speed", style="yellow")
-    table.add_column("Cost")
+def models(
+    free: bool = typer.Option(False, "--free", help="Show only free models"),
+    vision: bool = typer.Option(False, "--vision", help="Show only vision-capable models"),
+    search: Optional[str] = typer.Option(None, "--search", "-q", help="Search by name or ID"),
+    refresh: bool = typer.Option(False, "--refresh", help="Force refresh from OpenRouter API"),
+) -> None:
+    """[bold]List[/bold] available OpenRouter models (fetched from API, cached 24h)."""
+    from .model_registry import fetch_models, get_free_models, get_vision_models, search_models
 
-    rows = [
-        ("openrouter/free", "Good", "Fast", "Free"),
-        ("mistralai/mistral-7b-instruct:free", "Good", "Fast", "Free"),
-        ("meta-llama/llama-3.3-70b-instruct:free", "Very Good", "Medium", "Free"),
-        ("google/gemma-3-27b-it:free", "Very Good", "Medium", "Free"),
-        ("anthropic/claude-3-5-haiku", "Excellent", "Fast", "Paid"),
-        ("anthropic/claude-sonnet-4-5", "Best", "Medium", "Paid"),
-        ("openai/gpt-4o-mini", "Very Good", "Fast", "Paid"),
-    ]
-    for row in rows:
-        table.add_row(*row)
+    if refresh:
+        fetch_models(force=True)
+
+    if search:
+        result = search_models(search)
+    elif free and vision:
+        result = get_free_models(vision_only=True)
+    elif free:
+        result = get_free_models()
+    elif vision:
+        result = get_vision_models()
+    else:
+        result = fetch_models()
+
+    if not result:
+        console.print("[yellow]No models found. Try --refresh or check your connection.[/yellow]")
+        raise typer.Exit(1)
+
+    # Show top 30 to keep output manageable
+    shown = result[:30]
+    title = "OpenRouter Models"
+    if free:
+        title += " (Free)"
+    if vision:
+        title += " (Vision)"
+    if search:
+        title += f" matching '{search}'"
+
+    table = Table(title=title, show_lines=True)
+    table.add_column("Model ID", style="cyan", max_width=45)
+    table.add_column("Context", style="dim", width=8)
+    table.add_column("Vision", width=6)
+    table.add_column("Cost", width=8)
+
+    for m in shown:
+        ctx = f"{m['context_length'] // 1000}k" if m["context_length"] else "?"
+        vis = "[green]Yes[/green]" if m["has_vision"] else "[dim]No[/dim]"
+        cost = "[green]Free[/green]" if m["is_free"] else "Paid"
+        table.add_row(m["id"], ctx, vis, cost)
 
     console.print(table)
+    if len(result) > 30:
+        console.print(f"\n[dim]Showing 30 of {len(result)} models. Use --search to narrow down.[/dim]")
     console.print(
         "\n[dim]Use with:[/dim] [cyan]studycraft generate doc.pdf --model <model-id>[/cyan]"
+        "\n[dim]Filters:[/dim] --free  --vision  --search <query>  --refresh"
     )
 
 
