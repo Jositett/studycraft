@@ -28,9 +28,17 @@ app = typer.Typer(
     name="studycraft",
     help="📖 StudyCraft — craft structured practice guides from any document",
     rich_markup_mode="rich",
-    no_args_is_help=True,
+    invoke_without_command=True,
 )
 console = Console()
+
+
+@app.callback()
+def _default(ctx: typer.Context) -> None:
+    """Launch the web UI if no command is given."""
+    if ctx.invoked_subcommand is None:
+        from .web import main as web_main
+        web_main()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

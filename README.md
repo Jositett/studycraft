@@ -103,15 +103,17 @@ PDF, DOCX, TXT, MD, RTF
 
 ## Web UI
 
+The web UI is the default when you run `studycraft` with no arguments:
+
 ```bash
-# With uv
-uv add fastapi uvicorn python-multipart
+# Launches web UI at http://localhost:8000
+uv run studycraft
+
+# Or explicitly
 uv run studycraft-web
 
 # With Docker
 docker compose up -d
-
-# Open http://localhost:8000
 ```
 
 ---
@@ -162,9 +164,12 @@ docker run --rm --env-file .env -v $(pwd)/output:/app/output studycraft \
 ## Development
 
 ```bash
-uv sync --group dev          # Install with dev deps
-uv run ruff check src/       # Lint
-uv run pytest tests/ -v      # Test (53 tests)
+uv sync --group dev                    # Install with dev deps
+uv run python scripts/ci.py            # Run full CI (lint + test + build)
+uv run python scripts/ci.py --lint     # Lint only
+uv run python scripts/ci.py --test     # Test only
+uv run python scripts/ci.py --build    # Build only
+uv run python scripts/release.py 0.7.0 # Release: CI + bump + tag + build
 ```
 
 See `PLAN.md` for the full development roadmap and `CHANGELOG.md` for version history.
