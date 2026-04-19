@@ -280,7 +280,7 @@ def create_app() -> "FastAPI":  # type: ignore
 
     from .jobstore import JobStore
 
-    app = FastAPI(title="StudyCraft", version="0.4.0")
+    app = FastAPI(title="StudyCraft", version="0.6.0")
     store = JobStore(db_path=OUTPUT_DIR / "jobs.db")
 
     @app.get("/", response_class=HTMLResponse)

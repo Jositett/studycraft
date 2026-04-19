@@ -1,6 +1,6 @@
 """StudyCraft — craft structured, research-backed practice guides from any document."""
 
-__version__ = "0.1.0"
+__version__ = "0.6.0"
 __author__ = "StudyCraft"
 
 from .engine import StudyCraft
