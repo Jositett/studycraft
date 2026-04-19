@@ -1,12 +1,14 @@
 [project]
 name = "studycraft"
-version = "0.1.0"
+version = "0.6.0"
 description = "Craft structured, research-backed practice guides from any document — PDF, DOCX, TXT, RTF, MD"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "chromadb>=1.5.8",
     "duckduckgo-search>=8.1.1",
+    "ebooklib>=0.20",
+    "ebooklib>=0.20",
     "hatchling>=1.29.0",
     "markdown>=3.10.2",
     "openai>=2.32.0",

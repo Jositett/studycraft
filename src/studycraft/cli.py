@@ -300,6 +300,55 @@ def validate(
 
 
 @app.command()
+def gist(
+    markdown_file: str = typer.Argument(..., help="Path to a .md guide to publish"),
+    public: bool = typer.Option(False, "--public", help="Make the gist public"),
+) -> None:
+    """[bold]Publish[/bold] a Markdown guide as a GitHub Gist."""
+    import json
+    import urllib.request
+    import urllib.error
+
+    md_path = Path(markdown_file)
+    if not md_path.exists():
+        console.print(f"[red]File not found:[/red] {md_path}")
+        raise typer.Exit(1)
+
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        console.print(
+            "[red]GITHUB_TOKEN not set.[/red] Add it to your .env file.\n"
+            "  Create a token at https://github.com/settings/tokens (gist scope)"
+        )
+        raise typer.Exit(1)
+
+    content = md_path.read_text(encoding="utf-8")
+    payload = json.dumps({
+        "description": f"StudyCraft Practice Guide - {md_path.stem}",
+        "public": public,
+        "files": {md_path.name: {"content": content}},
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://api.github.com/gists",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read())
+            console.print(f"[green]Gist created![/green] {data['html_url']}")
+    except urllib.error.HTTPError as exc:
+        console.print(f"[red]GitHub API error:[/red] {exc.code} {exc.reason}")
+        raise typer.Exit(1)
+
+
+@app.command()
 def models() -> None:
     """[bold]List[/bold] recommended OpenRouter models for guide generation."""
     table = Table(title="Recommended OpenRouter Models", show_lines=True)

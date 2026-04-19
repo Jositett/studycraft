@@ -62,3 +62,10 @@ def test_export_creates_docx(tmp_path: Path):
     assert "docx" in paths
     assert paths["docx"].exists()
     assert paths["docx"].name == "Test_Guide.docx"
+
+
+def test_export_creates_epub(tmp_path: Path):
+    paths = export_all(_SAMPLE_MD, tmp_path, base_name="Test_Guide")
+    assert "epub" in paths
+    assert paths["epub"].exists()
+    assert paths["epub"].name == "Test_Guide.epub"

@@ -207,6 +207,15 @@ def export_all(
     except Exception as exc:
         console.print(f"[yellow]\u26a0 DOCX skipped:[/yellow] {exc}")
 
+    # -- EPUB ------------------------------------------------------------------
+    try:
+        from .export_epub import export_epub
+        epub_path = output_dir / f"{base_name}.epub"
+        export_epub(full_markdown, epub_path, title=base_name.replace("_", " "))
+        paths["epub"] = epub_path
+    except Exception as exc:
+        console.print(f"[yellow]EPUB skipped:[/yellow] {exc}")
+
     return paths
 
 
