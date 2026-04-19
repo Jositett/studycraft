@@ -164,19 +164,24 @@ class StudyCraft:
         for idx, content in enumerate(generated):
             if not content or "<!-- Generation failed" in content:
                 continue
-            result = validate_chapter(content, label=f"Ch {idx + 1}")
-            if not result.passed and result.unfilled_placeholders > 0:
-                if on_progress:
-                    on_progress(
-                        len(targets),
-                        len(targets),
-                        f"Fixing chapter {idx + 1} placeholders...",
-                    )
-                fixed = self._fix_placeholders(content, doc_subject)
-                if fixed:
-                    generated[idx] = fixed
-                    console.print(f"  [green]Ch {idx + 1}: fixed placeholders[/green]")
+            try:
+                result = validate_chapter(content, label=f"Ch {idx + 1}")
+                if not result.passed and result.placeholder_count > 0:
+                    if on_progress:
+                        on_progress(
+                            len(targets),
+                            len(targets),
+                            f"Fixing chapter {idx + 1} placeholders...",
+                        )
+                    fixed = self._fix_placeholders(content, doc_subject)
+                    if fixed:
+                        generated[idx] = fixed
+                        console.print(
+                            f"  [green]Ch {idx + 1}: fixed placeholders[/green]"
+                        )
 
+            except Exception as exc:
+                console.print(f"  [yellow]Ch {idx + 1} review skipped: {exc}[/yellow]")
         # 7. Answer key (optional)
         # 7. Answer key (optional)
         if with_answers:
