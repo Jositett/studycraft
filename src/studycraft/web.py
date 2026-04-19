@@ -32,9 +32,6 @@ OUTPUT_DIR = Path("output")
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# In-memory job tracker: job_id → {status, progress, files}
-_jobs: dict[str, dict] = {}
-
 
 # ── Inline HTML UI (no templates dir needed) ──────────────────────────────────
 _HTML = """<!DOCTYPE html>
@@ -145,6 +142,11 @@ _HTML = """<!DOCTYPE html>
       Generate answer key
     </label>
 
+    <label for="context-input">Additional context files (optional)</label>
+    <input type="file" id="context-input" multiple accept=".pdf,.docx,.txt,.md,.rtf"
+      style="margin-bottom:1rem;font-size:.9rem">
+    <p style="color:var(--muted);font-size:.8rem;margin:-0.5rem 0 1rem">Extra files indexed into RAG for richer context (not generated as chapters)</p>
+
     <label for="model-select">Model</label>
     <select id="model-select">
       <option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B (Free · Fast)</option>
@@ -213,6 +215,8 @@ _HTML = """<!DOCTYPE html>
     form.append('subject', document.getElementById('subject-input').value);
     form.append('model', document.getElementById('model-select').value);
     form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
+    const ctxFiles = document.getElementById('context-input').files;
+    for (let i = 0; i < ctxFiles.length; i++) form.append('context_files', ctxFiles[i]);
 
     let jobId;
     try {
@@ -274,7 +278,10 @@ def create_app() -> "FastAPI":  # type: ignore
             "  uv add fastapi uvicorn jinja2 python-multipart"
         )
 
-    app = FastAPI(title="StudyCraft", version="0.1.0")
+    from .jobstore import JobStore
+
+    app = FastAPI(title="StudyCraft", version="0.4.0")
+    store = JobStore(db_path=OUTPUT_DIR / "jobs.db")
 
     @app.get("/", response_class=HTMLResponse)
     async def index():
@@ -287,6 +294,7 @@ def create_app() -> "FastAPI":  # type: ignore
         subject: str = Form(""),
         model: str = Form("meta-llama/llama-3.1-8b-instruct:free"),
         with_answers: str = Form(""),
+        context_files: list[UploadFile] = File(default=[]),
     ):
         api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
         if not api_key:
@@ -301,35 +309,36 @@ def create_app() -> "FastAPI":  # type: ignore
         content = await file.read()
         save_path.write_bytes(content)
 
-        _jobs[job_id] = {
-            "status": "queued",
-            "progress": 0,
-            "message": "Queued…",
-            "files": {},
-        }
+        # Save context files
+        ctx_paths: list[str] = []
+        for i, cf in enumerate(context_files):
+            if cf.filename:
+                cf_suffix = Path(cf.filename).suffix.lower()
+                cf_path = UPLOAD_DIR / f"{job_id}_ctx{i}{cf_suffix}"
+                cf_path.write_bytes(await cf.read())
+                ctx_paths.append(str(cf_path))
+
+        store.create(job_id)
         background_tasks.add_task(
-            _run_job, job_id, save_path, subject or None, model, api_key, bool(with_answers)
+            _run_job, job_id, save_path, subject or None, model, api_key,
+            bool(with_answers), ctx_paths, store,
         )
         return JSONResponse({"job_id": job_id})
 
     @app.get("/api/status/{job_id}")
     async def status(job_id: str):
-        job = _jobs.get(job_id)
+        job = store.get(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         return JSONResponse(job)
 
     @app.get("/api/jobs")
     async def list_jobs():
-        """List all jobs with their status."""
-        return JSONResponse({
-            jid: {"status": j["status"], "progress": j["progress"], "message": j["message"]}
-            for jid, j in _jobs.items()
-        })
+        return JSONResponse(store.list_all())
 
     @app.get("/api/download/{job_id}/{fmt}")
     async def download(job_id: str, fmt: str):
-        job = _jobs.get(job_id)
+        job = store.get(job_id)
         if not job or fmt not in job.get("files", {}):
             raise HTTPException(status_code=404, detail="File not found")
         return FileResponse(job["files"][fmt])
@@ -339,17 +348,18 @@ def create_app() -> "FastAPI":  # type: ignore
 
 async def _run_job(
     job_id: str, doc_path: Path, subject: str | None, model: str, api_key: str,
-    with_answers: bool = False,
+    with_answers: bool = False, context_files: list[str] | None = None,
+    store: "object | None" = None,
 ):
-    """Background job that runs StudyCraft and updates _jobs[job_id]."""
+    """Background job that runs StudyCraft and updates the job store."""
     try:
-        _jobs[job_id].update(status="running", progress=5, message="Loading document…")
+        store.update(job_id, status="running", progress=5, message="Loading document\u2026")
 
         from .engine import StudyCraft
 
         def _on_progress(current: int, total: int, msg: str) -> None:
-            pct = int(10 + (current / max(total, 1)) * 85)  # 10–95%
-            _jobs[job_id].update(progress=pct, message=msg)
+            pct = int(10 + (current / max(total, 1)) * 85)
+            store.update(job_id, progress=pct, message=msg)
 
         craft = StudyCraft(
             api_key=api_key,
@@ -359,17 +369,18 @@ async def _run_job(
 
         paths = craft.run(
             document_path=doc_path, subject=subject, on_progress=_on_progress,
-            with_answers=with_answers,
+            with_answers=with_answers, context_files=context_files,
         )
 
-        _jobs[job_id].update(
+        store.update(
+            job_id,
             status="done",
             progress=100,
             message="Guide ready!",
             files={fmt: str(path) for fmt, path in paths.items()},
         )
     except Exception as exc:
-        _jobs[job_id].update(status="error", message=str(exc))
+        store.update(job_id, status="error", message=str(exc))
 
 
 def main():

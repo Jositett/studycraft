@@ -73,6 +73,7 @@ class StudyCraft:
         only_chapter: int | None = None,
         with_answers: bool = False,
         on_progress: ProgressCallback = None,
+        context_files: list[str | Path] | None = None,
     ) -> dict[str, Path]:
         """
         Full pipeline: load → detect → index → generate → export.
@@ -82,6 +83,7 @@ class StudyCraft:
             subject: Override auto-detected subject name.
             resume_from: Skip chapter numbers below this (uses cache).
             only_chapter: Generate only this one chapter (by number).
+            context_files: Extra documents to index into RAG (not generated).
         """
         doc_path = Path(document_path)
 
@@ -107,6 +109,15 @@ class StudyCraft:
         # 4. Index into RAG (clear old index so this doc is isolated)
         self.rag.clear()
         self.rag.index(raw_text, source_name=doc_path.stem)
+
+        # 4b. Index supplementary context files
+        for ctx_path in context_files or []:
+            ctx_path = Path(ctx_path)
+            try:
+                ctx_text = load_document(ctx_path)
+                self.rag.index(ctx_text, source_name=ctx_path.stem)
+            except Exception as exc:
+                console.print(f"  [yellow]⚠ Skipping context file {ctx_path.name}: {exc}[/yellow]")
 
         # 5. Generate per chapter
         cache_dir = self.output_dir / ".cache"

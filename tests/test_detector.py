@@ -111,3 +111,57 @@ def test_chapters_to_outline():
     assert "1. Introduction" in outline
     assert "1.1 What Is Python" in outline
     assert "2. Basics" in outline
+
+
+# ── Roman numeral detection ───────────────────────────────────────────────────
+
+_ROMAN_DOC = """\
+Chapter I: Introduction
+This is the intro.
+
+Chapter II: Variables
+Variables store data.
+
+Chapter III: Functions
+Functions encapsulate logic.
+"""
+
+
+def test_roman_numeral_detection():
+    chapters = detect_chapters(_ROMAN_DOC)
+    assert len(chapters) == 3
+    assert chapters[0]["num"] == "1"
+    assert chapters[1]["num"] == "2"
+    assert chapters[2]["num"] == "3"
+    assert chapters[0]["title"] == "Introduction"
+
+
+# ── Appendix / glossary filtering ─────────────────────────────────────────────
+
+_APPENDIX_DOC = """\
+Chapter 1: Introduction
+Intro content.
+
+Chapter 2: Core Topics
+Core content.
+
+Appendix A: Extra Tables
+Some tables.
+
+Glossary
+Term definitions.
+
+Bibliography
+References here.
+"""
+
+
+def test_appendix_glossary_filtered():
+    chapters = detect_chapters(_APPENDIX_DOC)
+    titles = [ch["title"] for ch in chapters]
+    assert "Introduction" in titles
+    assert "Core Topics" in titles
+    for t in titles:
+        assert "Appendix" not in t
+        assert "Glossary" not in t
+        assert "Bibliography" not in t

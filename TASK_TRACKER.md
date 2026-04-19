@@ -1,24 +1,6 @@
 # Task Tracker
 
-## Current Sprint — v0.4.0
-
-### Phase 2.2 — Multi-file Support
-- [ ] Allow uploading supplementary PDFs merged into RAG
-- [ ] "Add context files" button in web UI
-
-### Phase 2.3 — Persistent Job Store
-- [ ] Replace in-memory `_jobs` dict with SQLite
-- [ ] Job history page
-- [ ] Auto-cleanup of old jobs after 24h
-
-### Phase 4.1 — Better Chapter Detection
-- [ ] LLM-based TOC extraction fallback
-- [ ] Non-Western chapter markers (Roman numerals, etc.)
-- [ ] Appendix/glossary detection
-
----
-
-## Backlog
+## Current Sprint — v0.5.0
 
 ### Phase 4.2 — Richer RAG
 - [ ] Benchmark `all-mpnet-base-v2` vs `all-MiniLM-L6-v2`
@@ -37,7 +19,30 @@
 
 ---
 
+## Backlog
+
+### Phase 5.2 — Integrations
+- [ ] Notion API — push guide chapters as Notion pages
+- [ ] GitHub Gist — one-click publish
+- [ ] Google Docs — export via Drive API
+
+### Phase 6.2 — GitHub Actions
+- [ ] Workflow: regenerate guide on source doc change
+- [ ] Upload artifacts to GitHub Release
+- [ ] Cache rag_index/ and .venv/
+
+---
+
 ## Completed
+
+### v0.4.0 — Multi-file RAG, SQLite Jobs & Better Detection ✅
+- [x] `--context` / `-x` CLI flag for supplementary RAG files
+- [x] Web UI multi-file context upload
+- [x] SQLite job store (`jobstore.py`) replacing in-memory dict
+- [x] Auto-cleanup of jobs older than 24h
+- [x] Roman numeral chapter detection (I, II, III, IV…)
+- [x] Appendix/glossary/bibliography/references filtering
+- [x] 46 tests passing (7 new)
 
 ### v0.3.0 — Smarter Prompting, Tests & API ✅
 - [x] XML-tagged prompt sections for stricter LLM compliance

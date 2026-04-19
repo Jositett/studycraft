@@ -2,6 +2,23 @@
 
 All notable changes to StudyCraft will be documented in this file.
 
+## [0.4.0] — 2025-01-20
+
+### Added
+- Multi-file RAG support: `--context` / `-x` CLI flag to index supplementary files into RAG without generating chapters from them
+- Web UI "Additional context files" multi-file upload field
+- `jobstore.py` — SQLite-backed persistent job store (replaces in-memory dict)
+- Auto-cleanup of jobs older than 24 hours on server startup
+- Roman numeral chapter detection ("Chapter I", "Chapter IV", etc.) with auto-conversion to Arabic
+- Appendix, glossary, bibliography, references, and index sections are now filtered out of chapter detection
+- `GET /api/jobs` now returns persistent job history
+- 7 new tests: Roman numerals, appendix filtering, SQLite job store CRUD
+
+### Changed
+- `engine.py` — `run()` accepts `context_files` parameter for supplementary RAG documents
+- `detector.py` — added Roman numeral pattern, `_roman_to_int()` helper, `_SKIP_PATTERN` filter
+- `web.py` — replaced `_jobs` dict with `JobStore`; generate endpoint accepts `context_files`
+
 ## [0.3.0] — 2025-01-20
 
 ### Added
@@ -11,7 +28,6 @@ All notable changes to StudyCraft will be documented in this file.
 - Answer key checkbox in web UI form
 - `GET /api/jobs` endpoint for listing all jobs
 - Test suite: 39 tests across 5 modules (loader, detector, validator, export, template)
-- `tests/` directory with `test_loader.py`, `test_detector.py`, `test_validator.py`, `test_export.py`, `test_template.py`
 
 ### Changed
 - `engine.py` — prompt now uses XML tags (`<subject>`, `<document_context>`, `<rules>`, etc.)

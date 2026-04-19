@@ -112,6 +112,12 @@ def generate(
         "--with-answers",
         help="Generate an answer key after the guide",
     ),
+    context: Optional[list[str]] = typer.Option(
+        None,
+        "--context",
+        "-x",
+        help="Extra files to index into RAG for richer context (not generated)",
+    ),
     clear_cache: bool = typer.Option(
         False,
         "--clear-cache",
@@ -158,6 +164,7 @@ def generate(
             resume_from=resume_from,
             only_chapter=chapter,
             with_answers=with_answers,
+            context_files=context,
         )
     except ValueError as exc:
         console.print(f"[red]✗ Error:[/red] {exc}")
