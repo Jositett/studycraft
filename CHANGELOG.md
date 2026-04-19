@@ -2,6 +2,32 @@
 
 All notable changes to StudyCraft will be documented in this file.
 
+## [0.7.0] — 2025-01-21
+
+### Added
+- EPUB file upload support (loader + web UI + CLI)
+- Dark mode web UI by default with improved UX
+- Dynamic model selection from OpenRouter API (replaces hardcoded list)
+- Refresh models button with cache-busting (`/api/models?refresh=1`)
+- Favicon (SVG book emoji) — no more 404
+- Usage guide aside panel in web UI
+- Custom scrollbar styling (dark theme)
+- Progress time estimates in web UI ("~3m remaining")
+- "Generate another" reset button after completion
+- `HF_TOKEN` support in `.env` for authenticated HuggingFace downloads
+- 429 rate-limit retry with exponential backoff in engine
+
+### Changed
+- Replaced `weasyprint` (requires GTK) with `fpdf2` (pure Python) for PDF export
+- Fixed `researcher.py` import: `from ddgs import DDGS` → `from duckduckgo_search import DDGS`
+- Web UI drop zone shows green border when file is selected
+- Download buttons use flex grid layout with format-specific styling
+- Answer key generation now uses same backoff retry logic
+- 53 tests passing
+
+### Removed
+- `weasyprint` dependency (no longer requires GTK/native libs on Windows)
+
 ## [0.6.0] — 2025-01-20
 
 ### Added

@@ -80,17 +80,19 @@ def _normalize(raw_models: list[dict]) -> list[dict[str, Any]]:
             or "vision" in model_id.lower()
         )
 
-        out.append({
-            "id": model_id,
-            "name": m.get("name", model_id),
-            "context_length": m.get("context_length", 0),
-            "prompt_price": prompt_price,
-            "completion_price": completion_price,
-            "is_free": prompt_price == 0 and completion_price == 0,
-            "has_vision": has_vision,
-            "input_modalities": input_modalities,
-            "description": m.get("description", ""),
-        })
+        out.append(
+            {
+                "id": model_id,
+                "name": m.get("name", model_id),
+                "context_length": m.get("context_length", 0),
+                "prompt_price": prompt_price,
+                "completion_price": completion_price,
+                "is_free": prompt_price == 0 and completion_price == 0,
+                "has_vision": has_vision,
+                "input_modalities": input_modalities,
+                "description": m.get("description", ""),
+            }
+        )
     return out
 
 

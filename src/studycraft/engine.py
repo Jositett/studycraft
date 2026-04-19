@@ -120,7 +120,9 @@ class StudyCraft:
                 ctx_text = load_document(ctx_path)
                 self.rag.index(ctx_text, source_name=ctx_path.stem)
             except Exception as exc:
-                console.print(f"  [yellow]Skipping context file {ctx_path.name}: {exc}[/yellow]")
+                console.print(
+                    f"  [yellow]Skipping context file {ctx_path.name}: {exc}[/yellow]"
+                )
 
         # 5. Generate per chapter
         cache_dir = self.output_dir / ".cache"
@@ -142,7 +144,7 @@ class StudyCraft:
                 on_progress(len(targets), len(targets), "Generating answer key...")
             console.print("[cyan]Generating answer key...[/cyan]")
             answer_key = self._generate_answer_key(generated, doc_subject)
-            safe = re.sub(r'[^\w\s-]', '', doc_subject).strip().replace(' ', '_')
+            safe = re.sub(r"[^\w\s-]", "", doc_subject).strip().replace(" ", "_")
             ak_path = self.output_dir / f"{safe}_Answer_Key.md"
             ak_path.write_text(answer_key, encoding="utf-8")
             console.print(f"[green]Answer Key[/green] -> {ak_path}")
@@ -192,7 +194,9 @@ class StudyCraft:
             if workers > 1 and len(targets) > 1:
                 console.print(f"[cyan]Parallel mode: {workers} workers[/cyan]")
                 with ThreadPoolExecutor(max_workers=workers) as pool:
-                    futures = [pool.submit(_gen_one, i, ch) for i, ch in enumerate(targets)]
+                    futures = [
+                        pool.submit(_gen_one, i, ch) for i, ch in enumerate(targets)
+                    ]
                     for future in futures:
                         idx, content = future.result()
                         generated[idx] = content
@@ -205,7 +209,9 @@ class StudyCraft:
                     msg = f"Generating chapter {idx + 1} of {len(targets)}: {ch['title'][:40]}"
                     if on_progress:
                         on_progress(idx, len(targets), msg)
-                    progress.update(task, description=f"Ch {ch['num']}: {ch['title'][:40]}...")
+                    progress.update(
+                        task, description=f"Ch {ch['num']}: {ch['title'][:40]}..."
+                    )
 
                     _, content = _gen_one(idx, ch)
                     generated[idx] = content
@@ -315,13 +321,8 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
 </rules>"""
 
         try:
-            resp = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                max_tokens=4500,
-            )
-            content = resp.choices[0].message.content.strip()
+            resp = self._llm_call_with_backoff(prompt=prompt, temperature=temperature)
+            content = resp.strip()
             # Strip accidental markdown fences
             content = re.sub(r"^```(?:markdown)?\n?", "", content)
             content = re.sub(r"\n```$", "", content)
@@ -333,11 +334,32 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                 f"<!-- Generation failed: {exc} -->\n"
             )
 
+    def _llm_call_with_backoff(
+        self, prompt: str, temperature: float = 0.3, max_attempts: int = 4
+    ) -> str:
+        """Call the LLM with exponential backoff on 429 rate-limit errors."""
+        for attempt in range(max_attempts):
+            try:
+                resp = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=temperature,
+                    max_tokens=4500,
+                )
+                return resp.choices[0].message.content.strip()
+            except Exception as exc:
+                if "429" in str(exc) and attempt < max_attempts - 1:
+                    wait = self.rate_limit_seconds * (2**attempt)
+                    console.print(
+                        f"  [yellow]Rate limited, waiting {wait}s before retry...[/yellow]"
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
+
     # -- Answer key generation -------------------------------------------------
 
-    def _generate_answer_key(
-        self, chapter_contents: list[str], subject: str
-    ) -> str:
+    def _generate_answer_key(self, chapter_contents: list[str], subject: str) -> str:
         """Generate an answer key from all chapter quiz questions and exercises."""
         sections = []
         for content in chapter_contents:
@@ -362,13 +384,7 @@ QUESTIONS AND EXERCISES:
 Format as clean Markdown with clear numbering."""
 
         try:
-            resp = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=4500,
-            )
-            body = resp.choices[0].message.content.strip()
+            body = self._llm_call_with_backoff(prompt=prompt, temperature=0.2)
             return f"# Answer Key -- {subject}\n\n{body}"
         except Exception as exc:
             return f"# Answer Key -- {subject}\n\n<!-- Generation failed: {exc} -->"

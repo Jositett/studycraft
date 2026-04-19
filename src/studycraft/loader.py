@@ -45,6 +45,7 @@ def load_document(path: Path) -> str:
 
 # ── Format-specific loaders ───────────────────────────────────────────────────
 
+
 def _load_pdf(path: Path) -> str:
     from pypdf import PdfReader
 
@@ -55,7 +56,9 @@ def _load_pdf(path: Path) -> str:
         if text.strip():
             pages.append(text)
         else:
-            console.print(f"  [dim yellow]⚠ Page {i+1} yielded no text (may be scanned image)[/dim yellow]")
+            console.print(
+                f"  [dim yellow]⚠ Page {i + 1} yielded no text (may be scanned image)[/dim yellow]"
+            )
     return "\n".join(pages)
 
 
@@ -90,6 +93,7 @@ def _load_epub(path: Path) -> str:
 
 
 # ── Utility ───────────────────────────────────────────────────────────────────
+
 
 def supported_extensions() -> list[str]:
     return sorted(SUPPORTED)

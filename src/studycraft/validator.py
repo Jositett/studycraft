@@ -93,7 +93,9 @@ def validate_chapter(text: str, label: str = "") -> ValidationResult:
 def validate_guide(full_markdown: str) -> list[ValidationResult]:
     """Validate an entire guide by splitting on chapter boundaries."""
     # Split on top-level chapter headings
-    chapters = re.split(r"(?=^#\s+📖\s+Practice\s+Guide)", full_markdown, flags=re.MULTILINE)
+    chapters = re.split(
+        r"(?=^#\s+📖\s+Practice\s+Guide)", full_markdown, flags=re.MULTILINE
+    )
     if not chapters or (len(chapters) == 1 and not chapters[0].strip()):
         chapters = re.split(r"(?=^#\s+Chapter\s+\d)", full_markdown, flags=re.MULTILINE)
 

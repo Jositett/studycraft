@@ -138,6 +138,7 @@ output/
 | Variable | Required | Description |
 |-----------|----------|-------------|
 | `OPENROUTER_API_KEY` | Yes | Get a free key at [OpenRouter](https://openrouter.ai) |
+| `HF_TOKEN` | No | HuggingFace token for faster RAG model downloads. Get one at [HuggingFace](https://huggingface.co/settings/tokens) |
 | `GITHUB_TOKEN` | No | For `studycraft gist` (gist scope) |
 
 ---

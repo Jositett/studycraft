@@ -188,8 +188,7 @@ def export_all(
     # ── PDF ───────────────────────────────────────────────────────────────────
     pdf_path = output_dir / f"{base_name}.pdf"
     try:
-        import weasyprint  # type: ignore
-        weasyprint.HTML(string=html_doc).write_pdf(str(pdf_path))
+        _export_pdf(full_markdown, pdf_path, base_name)
         console.print(f"[green]✓ PDF[/green]      → {pdf_path}")
         paths["pdf"] = pdf_path
     except Exception as exc:
@@ -201,6 +200,7 @@ def export_all(
     # ── DOCX ──────────────────────────────────────────────────────────────────
     try:
         from .export_docx import export_docx
+
         docx_path = output_dir / f"{base_name}.docx"
         export_docx(full_markdown, docx_path)
         paths["docx"] = docx_path
@@ -210,6 +210,7 @@ def export_all(
     # -- EPUB ------------------------------------------------------------------
     try:
         from .export_epub import export_epub
+
         epub_path = output_dir / f"{base_name}.epub"
         export_epub(full_markdown, epub_path, title=base_name.replace("_", " "))
         paths["epub"] = epub_path
@@ -217,6 +218,95 @@ def export_all(
         console.print(f"[yellow]EPUB skipped:[/yellow] {exc}")
 
     return paths
+
+
+def _export_pdf(full_markdown: str, pdf_path: Path, base_name: str) -> None:
+    """Generate a styled PDF from Markdown using fpdf2 (pure Python, no GTK)."""
+    import re as _re
+    from fpdf import FPDF  # type: ignore
+
+    class _PDF(FPDF):
+        def header(self):
+            self.set_font("Helvetica", "I", 8)
+            self.set_text_color(150, 150, 150)
+            self.cell(0, 8, base_name.replace("_", " "), align="C")
+            self.ln(10)
+
+        def footer(self):
+            self.set_y(-15)
+            self.set_font("Helvetica", "I", 8)
+            self.set_text_color(150, 150, 150)
+            self.cell(0, 10, f"Page {self.page_no()}/{{nb}}", align="C")
+
+    pdf = _PDF()
+    pdf.alias_nb_pages()
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.add_page()
+
+    for line in full_markdown.splitlines():
+        stripped = line.strip()
+
+        if stripped.startswith("# "):
+            pdf.set_font("Helvetica", "B", 18)
+            pdf.set_text_color(37, 99, 235)
+            pdf.ln(6)
+            pdf.multi_cell(0, 9, stripped[2:])
+            pdf.set_draw_color(37, 99, 235)
+            pdf.line(pdf.get_x() + 10, pdf.get_y(), pdf.w - 10, pdf.get_y())
+            pdf.ln(4)
+        elif stripped.startswith("## "):
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.set_text_color(30, 58, 138)
+            pdf.ln(4)
+            pdf.multi_cell(0, 8, stripped[3:])
+            pdf.ln(2)
+        elif stripped.startswith("### "):
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.set_text_color(124, 58, 237)
+            pdf.ln(3)
+            pdf.multi_cell(0, 7, stripped[4:])
+            pdf.ln(2)
+        elif stripped.startswith("```"):
+            pdf.set_font("Courier", "", 9)
+            pdf.set_text_color(226, 232, 240)
+            pdf.set_fill_color(30, 41, 59)
+        elif stripped == "---":
+            pdf.ln(4)
+            pdf.set_draw_color(229, 231, 235)
+            pdf.line(pdf.get_x() + 10, pdf.get_y(), pdf.w - 10, pdf.get_y())
+            pdf.ln(4)
+        elif stripped.startswith("- ") or stripped.startswith("* "):
+            pdf.set_font("Helvetica", "", 10)
+            pdf.set_text_color(17, 24, 39)
+            pdf.cell(8)
+            pdf.multi_cell(0, 6, f"\u2022 {stripped[2:]}")
+            pdf.ln(1)
+        elif _re.match(r"^\d+\.", stripped):
+            pdf.set_font("Helvetica", "", 10)
+            pdf.set_text_color(17, 24, 39)
+            pdf.cell(4)
+            pdf.multi_cell(0, 6, stripped)
+            pdf.ln(1)
+        elif stripped:
+            # Check if we're in a code block by font
+            if pdf.font_family == "Courier":
+                pdf.cell(4)
+                pdf.multi_cell(0, 5, stripped, fill=True)
+            else:
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(17, 24, 39)
+                # Handle **bold** inline
+                clean = _re.sub(r"\*\*(.+?)\*\*", r"\1", stripped)
+                pdf.multi_cell(0, 6, clean)
+                pdf.ln(1)
+        else:
+            # Empty line — reset from code block if needed
+            if pdf.font_family == "Courier":
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(17, 24, 39)
+            pdf.ln(3)
+
+    pdf.output(str(pdf_path))
 
 
 def _wrap(body: str, title: str) -> str:

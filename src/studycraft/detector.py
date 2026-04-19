@@ -55,12 +55,24 @@ class Chapter(TypedDict):
 # ── Roman numeral helper ─────────────────────────────────────────────────────
 
 _ROMAN_MAP = [
-    (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
-    (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
-    (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
+    (1000, "M"),
+    (900, "CM"),
+    (500, "D"),
+    (400, "CD"),
+    (100, "C"),
+    (90, "XC"),
+    (50, "L"),
+    (40, "XL"),
+    (10, "X"),
+    (9, "IX"),
+    (5, "V"),
+    (4, "IV"),
+    (1, "I"),
 ]
 
-_ROMAN_RE = re.compile(r"^(M{0,3})(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$", re.IGNORECASE)
+_ROMAN_RE = re.compile(
+    r"^(M{0,3})(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$", re.IGNORECASE
+)
 
 
 def _roman_to_int(s: str) -> int | None:
@@ -70,7 +82,7 @@ def _roman_to_int(s: str) -> int | None:
     result = 0
     i = 0
     for value, numeral in _ROMAN_MAP:
-        while s[i:i + len(numeral)] == numeral:
+        while s[i : i + len(numeral)] == numeral:
             result += value
             i += len(numeral)
     return result if result > 0 else None
@@ -166,9 +178,7 @@ def _detect_numbered(lines: list[str]) -> tuple[list[Chapter], list[_Span]]:
                 roman_val = _roman_to_int(num_str)
                 if roman_val is not None:
                     num_str = str(roman_val)
-                spans.append(
-                    _Span(num=num_str, title=m.group(2).strip(), start_line=i)
-                )
+                spans.append(_Span(num=num_str, title=m.group(2).strip(), start_line=i))
                 break
 
     if len(spans) < 2:

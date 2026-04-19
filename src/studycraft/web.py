@@ -394,11 +394,26 @@ _HTML = """<!DOCTYPE html>
     }
 
     // Poll status
+    const startTime = Date.now();
     const poll = setInterval(async () => {
       const r = await fetch(`/api/status/${jobId}`);
       const d = await r.json();
-      document.getElementById('status-text').textContent = d.message || '';
-      document.getElementById('progress-bar').style.width = (d.progress || 0) + '%';
+      const pct = d.progress || 0;
+      document.getElementById('progress-bar').style.width = pct + '%';
+
+      // Time estimate
+      let timeInfo = '';
+      if (pct > 5) {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const totalEst = elapsed / (pct / 100);
+        const remaining = Math.max(0, Math.round(totalEst - elapsed));
+        if (remaining > 60) {
+          timeInfo = ` (~${Math.round(remaining/60)}m remaining)`;
+        } else if (remaining > 0) {
+          timeInfo = ` (~${remaining}s remaining)`;
+        }
+      }
+      document.getElementById('status-text').textContent = (d.message || '') + timeInfo;
 
       if (d.status === 'done') {
         clearInterval(poll);
@@ -453,7 +468,7 @@ def create_app() -> "FastAPI":  # type: ignore
 
     from .jobstore import JobStore
 
-    app = FastAPI(title="StudyCraft", version="0.6.0")
+    app = FastAPI(title="StudyCraft", version="0.7.0")
     store = JobStore(db_path=OUTPUT_DIR / "jobs.db")
 
     @app.get("/favicon.svg")
@@ -498,8 +513,15 @@ def create_app() -> "FastAPI":  # type: ignore
 
         store.create(job_id)
         background_tasks.add_task(
-            _run_job, job_id, save_path, subject or None, model, api_key,
-            bool(with_answers), ctx_paths, store,
+            _run_job,
+            job_id,
+            save_path,
+            subject or None,
+            model,
+            api_key,
+            bool(with_answers),
+            ctx_paths,
+            store,
         )
         return JSONResponse({"job_id": job_id})
 
@@ -513,13 +535,24 @@ def create_app() -> "FastAPI":  # type: ignore
     @app.get("/api/models")
     async def list_models(refresh: bool = False):
         from .model_registry import fetch_models
+
         models = fetch_models(force=refresh)
         free = [m for m in models if m["is_free"]]
         paid = [m for m in models if not m["is_free"]]
         free.sort(key=lambda m: m["context_length"], reverse=True)
         paid.sort(key=lambda m: m["context_length"], reverse=True)
         result = free[:20] + paid[:10]
-        return JSONResponse([{"id": m["id"], "name": m["name"], "is_free": m["is_free"], "context_length": m["context_length"]} for m in result])
+        return JSONResponse(
+            [
+                {
+                    "id": m["id"],
+                    "name": m["name"],
+                    "is_free": m["is_free"],
+                    "context_length": m["context_length"],
+                }
+                for m in result
+            ]
+        )
 
     @app.get("/api/jobs")
     async def list_jobs():
@@ -536,13 +569,20 @@ def create_app() -> "FastAPI":  # type: ignore
 
 
 async def _run_job(
-    job_id: str, doc_path: Path, subject: str | None, model: str, api_key: str,
-    with_answers: bool = False, context_files: list[str] | None = None,
+    job_id: str,
+    doc_path: Path,
+    subject: str | None,
+    model: str,
+    api_key: str,
+    with_answers: bool = False,
+    context_files: list[str] | None = None,
     store: "object | None" = None,
 ):
     """Background job that runs StudyCraft and updates the job store."""
     try:
-        store.update(job_id, status="running", progress=5, message="Loading document\u2026")
+        store.update(
+            job_id, status="running", progress=5, message="Loading document\u2026"
+        )
 
         from .engine import StudyCraft
 
@@ -557,8 +597,11 @@ async def _run_job(
         )
 
         paths = craft.run(
-            document_path=doc_path, subject=subject, on_progress=_on_progress,
-            with_answers=with_answers, context_files=context_files,
+            document_path=doc_path,
+            subject=subject,
+            on_progress=_on_progress,
+            with_answers=with_answers,
+            context_files=context_files,
         )
 
         store.update(

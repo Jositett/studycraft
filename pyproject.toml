@@ -1,6 +1,6 @@
 [project]
 name = "studycraft"
-version = "0.6.0"
+version = "0.7.0"
 description = "Craft structured, research-backed practice guides from any document — PDF, DOCX, TXT, RTF, EPUB, MD"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -22,7 +22,7 @@ dependencies = [
     "striprtf>=0.0.26",
     "typer>=0.15.0",
     "uvicorn>=0.44.0",
-    "weasyprint>=68.1",
+    "fpdf2>=2.8.3",
 ]
 
 [project.optional-dependencies]

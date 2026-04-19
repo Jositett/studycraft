@@ -50,6 +50,7 @@ def example_format_hint(subject_type: str) -> str:
         "humanities": "Use prose analysis, source excerpts, and argumentative examples.",
     }.get(subject_type, "Use the most appropriate format for the subject.")
 
+
 CHAPTER_TEMPLATE = """\
 # 📖 Practice Guide — {subject}
 ## Chapter {chapter_num}: {chapter_title}

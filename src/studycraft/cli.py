@@ -38,6 +38,7 @@ def _default(ctx: typer.Context) -> None:
     """Launch the web UI if no command is given."""
     if ctx.invoked_subcommand is None:
         from .web import main as web_main
+
         web_main()
 
 
@@ -194,7 +195,9 @@ def generate(
 def inspect(
     document: str = typer.Argument(..., help="Path to the document"),
     rag: bool = typer.Option(
-        False, "--rag", help="Also index into RAG and show which chunks match each chapter"
+        False,
+        "--rag",
+        help="Also index into RAG and show which chunks match each chapter",
     ),
 ) -> None:
     """[bold]Inspect[/bold] a document — show detected chapters without generating."""
@@ -304,7 +307,9 @@ def validate(
     if all_passed:
         console.print("\n[bold green]All chapters passed validation.[/bold green]")
     else:
-        console.print("\n[yellow]Some chapters have issues. Consider regenerating.[/yellow]")
+        console.print(
+            "\n[yellow]Some chapters have issues. Consider regenerating.[/yellow]"
+        )
 
 
 @app.command()
@@ -331,11 +336,13 @@ def gist(
         raise typer.Exit(1)
 
     content = md_path.read_text(encoding="utf-8")
-    payload = json.dumps({
-        "description": f"StudyCraft Practice Guide - {md_path.stem}",
-        "public": public,
-        "files": {md_path.name: {"content": content}},
-    }).encode()
+    payload = json.dumps(
+        {
+            "description": f"StudyCraft Practice Guide - {md_path.stem}",
+            "public": public,
+            "files": {md_path.name: {"content": content}},
+        }
+    ).encode()
 
     req = urllib.request.Request(
         "https://api.github.com/gists",
@@ -359,12 +366,23 @@ def gist(
 @app.command()
 def models(
     free: bool = typer.Option(False, "--free", help="Show only free models"),
-    vision: bool = typer.Option(False, "--vision", help="Show only vision-capable models"),
-    search: Optional[str] = typer.Option(None, "--search", "-q", help="Search by name or ID"),
-    refresh: bool = typer.Option(False, "--refresh", help="Force refresh from OpenRouter API"),
+    vision: bool = typer.Option(
+        False, "--vision", help="Show only vision-capable models"
+    ),
+    search: Optional[str] = typer.Option(
+        None, "--search", "-q", help="Search by name or ID"
+    ),
+    refresh: bool = typer.Option(
+        False, "--refresh", help="Force refresh from OpenRouter API"
+    ),
 ) -> None:
     """[bold]List[/bold] available OpenRouter models (fetched from API, cached 24h)."""
-    from .model_registry import fetch_models, get_free_models, get_vision_models, search_models
+    from .model_registry import (
+        fetch_models,
+        get_free_models,
+        get_vision_models,
+        search_models,
+    )
 
     if refresh:
         fetch_models(force=True)
@@ -381,7 +399,9 @@ def models(
         result = fetch_models()
 
     if not result:
-        console.print("[yellow]No models found. Try --refresh or check your connection.[/yellow]")
+        console.print(
+            "[yellow]No models found. Try --refresh or check your connection.[/yellow]"
+        )
         raise typer.Exit(1)
 
     # Show top 30 to keep output manageable
@@ -408,7 +428,9 @@ def models(
 
     console.print(table)
     if len(result) > 30:
-        console.print(f"\n[dim]Showing 30 of {len(result)} models. Use --search to narrow down.[/dim]")
+        console.print(
+            f"\n[dim]Showing 30 of {len(result)} models. Use --search to narrow down.[/dim]"
+        )
     console.print(
         "\n[dim]Use with:[/dim] [cyan]studycraft generate doc.pdf --model <model-id>[/cyan]"
         "\n[dim]Filters:[/dim] --free  --vision  --search <query>  --refresh"

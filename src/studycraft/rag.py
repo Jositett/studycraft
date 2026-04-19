@@ -20,7 +20,9 @@ _COLLECTION = "studycraft_doc"
 class RAGIndex:
     def __init__(self, persist_dir: str | Path = "./rag_index") -> None:
         from chromadb import PersistentClient
-        from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+        from chromadb.utils.embedding_functions import (
+            SentenceTransformerEmbeddingFunction,
+        )
 
         self._client = PersistentClient(path=str(persist_dir))
         self._ef = SentenceTransformerEmbeddingFunction(model_name=_EMBED_MODEL)
@@ -46,12 +48,13 @@ class RAGIndex:
             pass
 
         metadatas = [
-            {"source": source_name, "chunk_index": i}
-            for i in range(len(chunks))
+            {"source": source_name, "chunk_index": i} for i in range(len(chunks))
         ]
 
         self._col.add(documents=chunks, ids=ids, metadatas=metadatas)
-        console.print(f"  [cyan]\u2713 RAG:[/cyan] indexed {len(chunks)} chunks from '{source_name}'")
+        console.print(
+            f"  [cyan]\u2713 RAG:[/cyan] indexed {len(chunks)} chunks from '{source_name}'"
+        )
         return len(chunks)
 
     def query(self, topic: str, n_results: int = 4) -> str:
@@ -67,7 +70,9 @@ class RAGIndex:
         """Return top-n chunks with metadata for inspection."""
         try:
             res = self._col.query(
-                query_texts=[topic], n_results=n_results, include=["documents", "metadatas", "distances"]
+                query_texts=[topic],
+                n_results=n_results,
+                include=["documents", "metadatas", "distances"],
             )
             docs = res.get("documents", [[]])[0]
             metas = res.get("metadatas", [[]])[0]
@@ -98,7 +103,10 @@ class RAGIndex:
         except Exception:
             pass
         # Re-create empty
-        from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+        from chromadb.utils.embedding_functions import (
+            SentenceTransformerEmbeddingFunction,
+        )
+
         self._ef = SentenceTransformerEmbeddingFunction(model_name=_EMBED_MODEL)
         self._col = self._client.get_or_create_collection(
             name=_COLLECTION,

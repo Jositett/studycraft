@@ -67,10 +67,7 @@ class JobStore:
         rows = self._conn.execute(
             "SELECT id, status, progress, message FROM jobs ORDER BY created_at DESC"
         ).fetchall()
-        return {
-            r[0]: {"status": r[1], "progress": r[2], "message": r[3]}
-            for r in rows
-        }
+        return {r[0]: {"status": r[1], "progress": r[2], "message": r[3]} for r in rows}
 
     def _cleanup(self) -> None:
         cutoff = time.time() - _EXPIRY_SECONDS

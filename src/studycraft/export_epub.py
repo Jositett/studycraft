@@ -29,7 +29,9 @@ td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; }
 """
 
 
-def export_epub(full_markdown: str, output_path: Path, title: str = "StudyCraft Guide") -> Path:
+def export_epub(
+    full_markdown: str, output_path: Path, title: str = "StudyCraft Guide"
+) -> Path:
     """Export Markdown text to an EPUB file."""
     from ebooklib import epub  # type: ignore
 
@@ -40,7 +42,12 @@ def export_epub(full_markdown: str, output_path: Path, title: str = "StudyCraft 
     book.add_author("StudyCraft")
 
     # CSS
-    css = epub.EpubItem(uid="style", file_name="style/default.css", media_type="text/css", content=_EPUB_CSS.encode())
+    css = epub.EpubItem(
+        uid="style",
+        file_name="style/default.css",
+        media_type="text/css",
+        content=_EPUB_CSS.encode(),
+    )
     book.add_item(css)
 
     # Split into chapters on "# " headings
