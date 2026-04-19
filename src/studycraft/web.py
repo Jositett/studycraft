@@ -864,7 +864,8 @@ def create_app() -> "FastAPI":  # type: ignore
         job = store.get(job_id)
         if not job or fmt not in job.get("files", {}):
             raise HTTPException(status_code=404, detail="File not found")
-        return FileResponse(job["files"][fmt])
+        file_path = job["files"][fmt]
+        return FileResponse(file_path, filename=Path(file_path).name)
 
     @app.post("/api/control/{job_id}")
     async def control(job_id: str, action: str = Form(...)):

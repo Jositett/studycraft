@@ -531,9 +531,18 @@ Format as clean Markdown with clear numbering."""
 
         try:
             body = self._llm_call_with_backoff(prompt=prompt, temperature=0.2)
-            return f"# Answer Key -- {subject}\n\n{body}"
-        except Exception as exc:
-            return f"# Answer Key -- {subject}\n\n<!-- Generation failed: {exc} -->"
+            result = f"# Answer Key -- {subject}\n\n{body}"
+            # Retry if result looks incomplete
+            if len(result) < 200 or "<!-- Generation failed" in result:
+                body = self._llm_call_with_backoff(prompt=prompt, temperature=0.3)
+                result = f"# Answer Key -- {subject}\n\n{body}"
+            return result
+        except Exception:
+            try:
+                body = self._llm_call_with_backoff(prompt=prompt, temperature=0.3)
+                return f"# Answer Key -- {subject}\n\n{body}"
+            except Exception as exc:
+                return f"# Answer Key -- {subject}\n\n<!-- Generation failed: {exc} -->"
 
 
 # -- Helpers -------------------------------------------------------------------
