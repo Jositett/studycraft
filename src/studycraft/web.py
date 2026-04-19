@@ -331,16 +331,19 @@ async def _run_job(
 
         from .engine import StudyCraft
 
+        def _on_progress(current: int, total: int, msg: str) -> None:
+            pct = int(10 + (current / max(total, 1)) * 85)  # 10–95%
+            _jobs[job_id].update(progress=pct, message=msg)
+
         craft = StudyCraft(
             api_key=api_key,
             model=model,
             output_dir=str(OUTPUT_DIR / job_id),
         )
 
-        # Patch progress into the job dict — TODO: wire into engine events in Phase 2
-        _jobs[job_id].update(progress=20, message="Detecting chapters…")
-
-        paths = craft.run(document_path=doc_path, subject=subject)
+        paths = craft.run(
+            document_path=doc_path, subject=subject, on_progress=_on_progress
+        )
 
         _jobs[job_id].update(
             status="done",

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from openai import OpenAI
@@ -26,8 +27,12 @@ from .detector import detect_chapters, chapters_to_outline, Chapter
 from .rag import RAGIndex
 from .researcher import research
 from .template import CHAPTER_TEMPLATE
+from .validator import validate_chapter
 
 console = Console()
+
+# Type alias for progress callbacks: (current, total, message) -> None
+ProgressCallback = Callable[[int, int, str], None] | None
 
 DEFAULT_MODEL = "openrouter/free"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
@@ -66,6 +71,8 @@ class StudyCraft:
         subject: str | None = None,
         resume_from: int = 1,
         only_chapter: int | None = None,
+        with_answers: bool = False,
+        on_progress: ProgressCallback = None,
     ) -> dict[str, Path]:
         """
         Full pipeline: load → detect → index → generate → export.
@@ -122,9 +129,13 @@ class StudyCraft:
         ) as progress:
             task = progress.add_task("Generating chapters…", total=len(targets))
 
-            for ch in targets:
+            for idx, ch in enumerate(targets):
                 ch_num = ch["num"]
                 cache_file = cache_dir / f"ch{ch_num.replace('.', '_')}.md"
+                msg = f"Generating chapter {idx + 1} of {len(targets)}: {ch['title'][:40]}"
+
+                if on_progress:
+                    on_progress(idx, len(targets), msg)
 
                 if int(ch_num.split(".")[0]) < resume_from and cache_file.exists():
                     progress.print(f"[dim]⏩ Ch {ch_num} — from cache[/dim]")
@@ -133,7 +144,7 @@ class StudyCraft:
                     continue
 
                 progress.update(task, description=f"Ch {ch_num}: {ch['title'][:40]}…")
-                content = self._generate_chapter(ch, doc_subject)
+                content = self._generate_chapter_with_retry(ch, doc_subject)
                 cache_file.write_text(content, encoding="utf-8")
                 generated.append(content)
                 progress.advance(task)
@@ -141,7 +152,17 @@ class StudyCraft:
                 if ch is not targets[-1]:
                     time.sleep(self.rate_limit_seconds)
 
-        # 6. Export
+        # 6. Answer key (optional)
+        if with_answers:
+            if on_progress:
+                on_progress(len(targets), len(targets), "Generating answer key…")
+            console.print("[cyan]📝 Generating answer key…[/cyan]")
+            answer_key = self._generate_answer_key(generated, doc_subject)
+            ak_path = self.output_dir / f"{re.sub(r'[^\w\s-]', '', doc_subject).strip().replace(' ', '_')}_Answer_Key.md"
+            ak_path.write_text(answer_key, encoding="utf-8")
+            console.print(f"[green]✓ Answer Key[/green] → {ak_path}")
+
+        # 7. Export
         combined = "\n\n---\n\n".join(generated)
         safe_name = re.sub(r"[^\w\s-]", "", doc_subject).strip().replace(" ", "_")
         from .export import export_all
@@ -152,7 +173,35 @@ class StudyCraft:
 
     # ── Chapter generation ────────────────────────────────────────────────────
 
-    def _generate_chapter(self, chapter: Chapter, subject: str) -> str:
+    def _generate_chapter_with_retry(
+        self, chapter: Chapter, subject: str, max_retries: int = 1
+    ) -> str:
+        """Generate a chapter, auto-retry once on validation failure."""
+        content = self._generate_chapter(chapter, subject)
+        result = validate_chapter(content, label=f"Ch {chapter['num']}")
+
+        if result.passed or max_retries < 1:
+            if not result.passed:
+                console.print(
+                    f"  [yellow]⚠ Ch {chapter['num']} validation:[/yellow] {result.summary()}"
+                )
+            return content
+
+        console.print(
+            f"  [yellow]⚠ Ch {chapter['num']} failed validation ({result.summary()}) — retrying…[/yellow]"
+        )
+        time.sleep(self.rate_limit_seconds)
+        content = self._generate_chapter(chapter, subject, temperature=0.5)
+        retry_result = validate_chapter(content, label=f"Ch {chapter['num']}")
+        if not retry_result.passed:
+            console.print(
+                f"  [yellow]⚠ Ch {chapter['num']} retry still has issues:[/yellow] {retry_result.summary()}"
+            )
+        return content
+
+    def _generate_chapter(
+        self, chapter: Chapter, subject: str, temperature: float = 0.3
+    ) -> str:
         sub_titles = [s["title"] for s in chapter["subchapters"]]
         sub_label = (
             "\n".join(f"  - {t}" for t in sub_titles) if sub_titles else "None detected"
@@ -209,7 +258,7 @@ RULES:
             resp = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
+                temperature=temperature,
                 max_tokens=4500,
             )
             content = resp.choices[0].message.content.strip()
@@ -223,6 +272,48 @@ RULES:
                 f"# Chapter {chapter['num']}: {chapter['title']}\n\n"
                 f"<!-- Generation failed: {exc} -->\n"
             )
+
+
+    # ── Answer key generation ─────────────────────────────────────────────────
+
+    def _generate_answer_key(
+        self, chapter_contents: list[str], subject: str
+    ) -> str:
+        """Generate an answer key from all chapter quiz questions and exercises."""
+        # Extract quiz + exercise sections from each chapter
+        sections = []
+        for content in chapter_contents:
+            for heading in ("Chapter Quiz", "Practice Exercises"):
+                parts = re.split(rf"(?i)##\s*\d*\.?\s*{heading}", content)
+                if len(parts) > 1:
+                    section_text = parts[1].split("##")[0].strip()
+                    sections.append(f"### {heading}\n{section_text}")
+
+        if not sections:
+            return f"# Answer Key — {subject}\n\nNo quiz questions or exercises found."
+
+        prompt = f"""You are an expert educator. Generate a complete answer key for the following quiz questions and practice exercises from a {subject} study guide.
+
+For each question/exercise:
+- Restate the question number
+- Provide the correct answer with a brief explanation
+
+QUESTIONS AND EXERCISES:
+{chr(10).join(sections[:6000])}
+
+Format as clean Markdown with clear numbering."""
+
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=4500,
+            )
+            body = resp.choices[0].message.content.strip()
+            return f"# 🔑 Answer Key — {subject}\n\n{body}"
+        except Exception as exc:
+            return f"# Answer Key — {subject}\n\n<!-- Generation failed: {exc} -->"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

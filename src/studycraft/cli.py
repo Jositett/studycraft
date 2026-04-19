@@ -107,6 +107,11 @@ def generate(
         "--rate-limit",
         help="Seconds to pause between chapters (free-tier rate limiting)",
     ),
+    with_answers: bool = typer.Option(
+        False,
+        "--with-answers",
+        help="Generate an answer key after the guide",
+    ),
     clear_cache: bool = typer.Option(
         False,
         "--clear-cache",
@@ -152,6 +157,7 @@ def generate(
             subject=subject,
             resume_from=resume_from,
             only_chapter=chapter,
+            with_answers=with_answers,
         )
     except ValueError as exc:
         console.print(f"[red]✗ Error:[/red] {exc}")
@@ -213,6 +219,44 @@ def export(
     console.print("[green]✓ Re-export complete.[/green]")
     for fmt, path in paths.items():
         console.print(f"  [cyan]{fmt.upper()}[/cyan] → {path.resolve()}")
+
+
+@app.command()
+def validate(
+    markdown_file: str = typer.Argument(..., help="Path to a generated .md guide"),
+) -> None:
+    """[bold]Validate[/bold] a generated guide — check sections, examples, quiz, placeholders."""
+    md_path = Path(markdown_file)
+    if not md_path.exists():
+        console.print(f"[red]✗ File not found:[/red] {md_path}")
+        raise typer.Exit(1)
+
+    from .validator import validate_guide
+
+    text = md_path.read_text(encoding="utf-8")
+    results = validate_guide(text)
+
+    if not results:
+        console.print("[yellow]No chapters found to validate.[/yellow]")
+        raise typer.Exit(1)
+
+    table = Table(title=f"Validation — {md_path.name}", show_lines=True)
+    table.add_column("Chapter", style="cyan", max_width=50)
+    table.add_column("Status", width=8)
+    table.add_column("Details", style="dim")
+
+    all_passed = True
+    for r in results:
+        status = "[green]✓[/green]" if r.passed else "[red]✗[/red]"
+        if not r.passed:
+            all_passed = False
+        table.add_row(r.chapter_label[:50], status, r.summary())
+
+    console.print(table)
+    if all_passed:
+        console.print("\n[bold green]All chapters passed validation.[/bold green]")
+    else:
+        console.print("\n[yellow]Some chapters have issues. Consider regenerating.[/yellow]")
 
 
 @app.command()
