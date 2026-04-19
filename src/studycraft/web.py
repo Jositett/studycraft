@@ -172,6 +172,30 @@ _HTML = """<!DOCTYPE html>
   }
   .new-btn:hover { border-color: var(--primary); color: var(--primary); }
 
+  .key-card { border-color: var(--accent); }
+  .key-card h2 { color: var(--accent); }
+  .key-field { margin-bottom: .75rem; }
+  .key-field label { display: flex; align-items: center; gap: .4rem; }
+  .key-field .key-status { font-size: .7rem; padding: .1rem .4rem; border-radius: 4px; font-weight: 600; }
+  .key-field .key-status.set { background: rgba(74,222,128,.15); color: var(--success); }
+  .key-field .key-status.missing { background: var(--error-bg); color: var(--error-text); }
+  .key-field input[type=password] {
+    width: 100%; padding: .6rem .85rem; border: 1px solid var(--border);
+    border-radius: 8px; font-size: .9rem; outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    background: var(--bg); color: var(--text);
+  }
+  .key-field input[type=password]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(109,159,255,.15); }
+  .key-field input[type=password]::placeholder { color: var(--muted); opacity: .6; }
+  .key-hint { font-size: .7rem; color: var(--muted); margin-top: .2rem; opacity: .7; }
+  .key-hint a { color: var(--primary); text-decoration: none; }
+  .key-save-btn {
+    margin-top: .5rem; padding: .5rem 1rem; font-size: .85rem; font-weight: 600;
+    border: 1px solid var(--accent); border-radius: 8px; cursor: pointer;
+    background: rgba(167,139,250,.1); color: var(--accent); transition: opacity .2s;
+  }
+  .key-save-btn:hover { opacity: .8; }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -214,6 +238,31 @@ _HTML = """<!DOCTYPE html>
 
 <div class="page-layout">
 <main>
+  <div class="card key-card" id="key-card" style="display:none">
+    <h2>\ud83d\udd11 API Keys</h2>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">Keys are stored in your browser only and never saved on the server.</p>
+
+    <div class="key-field">
+      <label>OpenRouter API Key <span class="key-status" id="openrouter-status"></span></label>
+      <input type="password" id="openrouter-key" placeholder="sk-or-v1-...">
+      <p class="key-hint">Required \u2014 Get a free key at <a href="https://openrouter.ai" target="_blank">openrouter.ai</a></p>
+    </div>
+
+    <div class="key-field">
+      <label>HuggingFace Token <span class="key-status" id="hf-status"></span></label>
+      <input type="password" id="hf-key" placeholder="hf_...">
+      <p class="key-hint">Optional \u2014 Faster RAG model downloads. Get one at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co</a></p>
+    </div>
+
+    <div class="key-field">
+      <label>GitHub Token <span class="key-status" id="github-status"></span></label>
+      <input type="password" id="github-key" placeholder="ghp_...">
+      <p class="key-hint">Optional \u2014 For publishing guides as Gists. <a href="https://github.com/settings/tokens" target="_blank">Create token</a> (gist scope)</p>
+    </div>
+
+    <button type="button" class="key-save-btn" onclick="saveKeys()">Save to browser</button>
+  </div>
+
   <div class="card" id="upload-card">
     <h2>Generate a Practice Guide</h2>
 
@@ -367,6 +416,61 @@ _HTML = """<!DOCTYPE html>
 <footer>StudyCraft · AI-powered practice guides · <a href="/docs">API docs</a></footer>
 
 <script>
+  // ── BYOK key management ──
+  const KEY_STORAGE = 'studycraft_keys';
+  let serverConfig = {};
+
+  function getSavedKeys() {
+    try { return JSON.parse(localStorage.getItem(KEY_STORAGE) || '{}'); } catch { return {}; }
+  }
+  function saveKeys() {
+    const keys = {
+      openrouter: document.getElementById('openrouter-key').value.trim(),
+      hf: document.getElementById('hf-key').value.trim(),
+      github: document.getElementById('github-key').value.trim(),
+    };
+    localStorage.setItem(KEY_STORAGE, JSON.stringify(keys));
+    updateKeyUI();
+  }
+  function getEffectiveKey(name) {
+    const saved = getSavedKeys();
+    return saved[name] || '';
+  }
+  function updateKeyUI() {
+    const saved = getSavedKeys();
+    const fields = [
+      { id: 'openrouter', inputId: 'openrouter-key', statusId: 'openrouter-status', serverKey: 'has_openrouter' },
+      { id: 'hf', inputId: 'hf-key', statusId: 'hf-status', serverKey: 'has_hf_token' },
+      { id: 'github', inputId: 'github-key', statusId: 'github-status', serverKey: 'has_github_token' },
+    ];
+    fields.forEach(f => {
+      const el = document.getElementById(f.statusId);
+      const input = document.getElementById(f.inputId);
+      const hasServer = serverConfig[f.serverKey];
+      const hasLocal = !!saved[f.id];
+      if (hasServer) {
+        el.textContent = 'Server'; el.className = 'key-status set';
+        input.placeholder = 'Set on server (override optional)';
+      } else if (hasLocal) {
+        el.textContent = 'Saved'; el.className = 'key-status set';
+        input.value = saved[f.id];
+      } else {
+        el.textContent = f.id === 'openrouter' ? 'Required' : 'Not set';
+        el.className = 'key-status ' + (f.id === 'openrouter' ? 'missing' : '');
+      }
+    });
+  }
+
+  async function loadConfig() {
+    try {
+      const r = await fetch('/api/config');
+      serverConfig = await r.json();
+    } catch { serverConfig = {}; }
+    document.getElementById('key-card').style.display = 'block';
+    updateKeyUI();
+  }
+  loadConfig();
+
   async function loadModels(refresh = false) {
     const sel = document.getElementById('model-select');
     sel.innerHTML = '<option value="" disabled selected>Loading models…</option>';
@@ -477,6 +581,10 @@ _HTML = """<!DOCTYPE html>
     form.append('theme', document.getElementById('theme-select').value);
     form.append('difficulty', document.getElementById('difficulty-select').value);
     form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
+    const saved = getSavedKeys();
+    if (saved.openrouter) form.append('api_key', saved.openrouter);
+    if (saved.hf) form.append('hf_token', saved.hf);
+    if (saved.github) form.append('github_token', saved.github);
     for (let i = 0; i < contextFiles.length; i++) form.append('context_files', contextFiles[i]);
 
     let jobId;
@@ -577,6 +685,7 @@ _HTML = """<!DOCTYPE html>
     renderContextFiles();
     document.getElementById('subject-input').value = '';
     document.getElementById('answers-check').checked = false;
+    document.getElementById('error-msg').style.display = 'none';
     document.getElementById('generate-btn').disabled = false;
     document.getElementById('upload-card').style.opacity = '1';
     document.getElementById('results-card').style.display = 'none';
@@ -611,6 +720,14 @@ def create_app() -> "FastAPI":  # type: ignore
     async def index():
         return _HTML
 
+    @app.get("/api/config")
+    async def config():
+        return JSONResponse({
+            "has_openrouter": bool(os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")),
+            "has_hf_token": bool(os.getenv("HF_TOKEN")),
+            "has_github_token": bool(os.getenv("GITHUB_TOKEN")),
+        })
+
     @app.post("/api/generate")
     async def generate(
         background_tasks: BackgroundTasks,
@@ -620,13 +737,22 @@ def create_app() -> "FastAPI":  # type: ignore
         with_answers: str = Form(""),
         theme: str = Form("dark"),
         difficulty: str = Form("intermediate"),
+        api_key: str = Form(""),
+        hf_token: str = Form(""),
+        github_token: str = Form(""),
         context_files: list[UploadFile] = File(default=[]),
     ):
-        api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
-        if not api_key:
+        # BYOK: user-provided key overrides server env
+        effective_key = api_key or os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
+        if not effective_key:
             raise HTTPException(
-                status_code=500, detail="OPENROUTER_API_KEY not configured on server"
+                status_code=400, detail="OpenRouter API key is required. Add it in the API Keys section above."
             )
+        # Set optional tokens for this request's environment
+        if hf_token:
+            os.environ["HF_TOKEN"] = hf_token
+        if github_token:
+            os.environ["GITHUB_TOKEN"] = github_token
 
         job_id = str(uuid.uuid4())[:8]
         suffix = Path(file.filename or "doc.pdf").suffix.lower()
@@ -651,7 +777,7 @@ def create_app() -> "FastAPI":  # type: ignore
             save_path,
             subject or None,
             model,
-            api_key,
+            effective_key,
             bool(with_answers),
             ctx_paths,
             store,
@@ -668,14 +794,14 @@ def create_app() -> "FastAPI":  # type: ignore
         return JSONResponse(job)
 
     @app.get("/api/models")
-    async def list_models(refresh: bool = False):
+    async def list_models(refresh: bool = False, user_key: str = ""):
         from .model_registry import fetch_models, get_verified_free_models, _HEALTH_FILE
 
         models = fetch_models(force=refresh)
 
         # On refresh, also run 1-token health probes
         if refresh:
-            api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
+            api_key = user_key or os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
             if api_key:
                 get_verified_free_models(api_key, force=True)
 
@@ -722,12 +848,12 @@ def create_app() -> "FastAPI":  # type: ignore
         return JSONResponse(store.list_all())
 
     @app.post("/api/models/test")
-    async def test_models():
+    async def test_models(user_key: str = Form("")):
         from .model_registry import get_verified_free_models
 
-        api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
+        api_key = user_key or os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
         if not api_key:
-            raise HTTPException(status_code=500, detail="No API key configured")
+            raise HTTPException(status_code=400, detail="OpenRouter API key required")
         verified = get_verified_free_models(api_key, force=True)
         return JSONResponse(
             {"tested": len(verified), "healthy": [m["id"] for m in verified]}
