@@ -182,7 +182,7 @@ class StudyCraft:
 
             except Exception as exc:
                 console.print(f"  [yellow]Ch {idx + 1} review skipped: {exc}[/yellow]")
-        # 7. Answer key (optional)
+
         # 7. Answer key (optional)
         if with_answers:
             if on_progress:

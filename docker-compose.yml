@@ -5,8 +5,16 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - PYTHONIOENCODING=utf-8
     volumes:
       - ./output:/app/output
       - ./uploads:/app/uploads
       - ./rag_index:/app/rag_index
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped

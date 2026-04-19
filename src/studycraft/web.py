@@ -1,13 +1,8 @@
 """
-StudyCraft – Web UI (Phase 2 scaffold).
+StudyCraft – Web UI.
 
 Start with:   uv run studycraft-web
 Or directly:  uv run python -m studycraft.web
-
-Requires additional dependencies (not in base install):
-    uv add fastapi uvicorn jinja2 python-multipart
-
-This file is a complete, working scaffold. Phase 2 tasks are marked TODO.
 """
 
 from __future__ import annotations
