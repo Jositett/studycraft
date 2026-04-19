@@ -59,11 +59,16 @@ class StudyCraft:
         rate_limit_seconds: int = 5,
     ) -> None:
         self.client = OpenAI(base_url=base_url, api_key=api_key)
+        self.api_key = api_key
         self.model = model
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.rate_limit_seconds = rate_limit_seconds
         self.rag = RAGIndex(persist_dir=rag_dir)
+        self._fallback_chain: list[str] = []
+        self._model_failures: dict[str, int] = {}
+        self._max_model_switches = 5
+        self._switches_used = 0
 
     # -- Public API ------------------------------------------------------------
 
@@ -364,7 +369,7 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
     def _llm_call_with_backoff(
         self, prompt: str, temperature: float = 0.3, max_attempts: int = 4
     ) -> str:
-        """Call the LLM with exponential backoff on retryable errors."""
+        """Call the LLM with exponential backoff and auto model switching."""
         last_exc = None
         for attempt in range(max_attempts):
             try:
@@ -385,19 +390,52 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                 if retryable and attempt < max_attempts - 1:
                     wait = self.rate_limit_seconds * (2**attempt)
                     console.print(
-                        f"  [yellow]Error {err[:60]}... waiting {wait}s before retry...[/yellow]"
+                        f"  [yellow]Error {err[:60]}... waiting {wait}s[/yellow]"
                     )
                     time.sleep(wait)
                 elif "400" in err and attempt < max_attempts - 1:
-                    # Bad request — try with truncated prompt
                     console.print(
                         "  [yellow]400 error, truncating prompt and retrying...[/yellow]"
                     )
                     prompt = prompt[: len(prompt) * 2 // 3]
                     time.sleep(self.rate_limit_seconds)
                 else:
+                    # Try switching model
+                    switched = self._try_switch_model()
+                    if switched and attempt < max_attempts - 1:
+                        continue
                     raise
         raise last_exc  # type: ignore[misc]
+
+    def _try_switch_model(self) -> bool:
+        """Attempt to switch to the next fallback model. Returns True if switched."""
+        if self._switches_used >= self._max_model_switches:
+            return False
+
+        # Lazy-load fallback chain
+        if not self._fallback_chain:
+            from .model_registry import get_fallback_chain
+
+            self._fallback_chain = get_fallback_chain(self.api_key)
+
+        # Track failures for current model
+        self._model_failures[self.model] = self._model_failures.get(self.model, 0) + 1
+
+        # Find next model not yet failed too many times
+        for candidate in self._fallback_chain:
+            if candidate == self.model:
+                continue
+            if self._model_failures.get(candidate, 0) >= 2:
+                continue
+            old = self.model
+            self.model = candidate
+            self._switches_used += 1
+            console.print(
+                f"  [cyan]Switching model: {old} -> {self.model} "
+                f"(switch {self._switches_used}/{self._max_model_switches})[/cyan]"
+            )
+            return True
+        return False
 
     # -- Answer key generation -------------------------------------------------
 

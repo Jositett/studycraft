@@ -658,9 +658,33 @@ def create_app() -> "FastAPI":  # type: ignore
         from .model_registry import fetch_models
 
         models = fetch_models(force=refresh)
+
+        # Load health cache to filter out known-bad models
+        healthy_ids = None
+        from .model_registry import _HEALTH_FILE
+
+        if _HEALTH_FILE.exists():
+            try:
+                import json as _json
+
+                hdata = _json.loads(_HEALTH_FILE.read_text(encoding="utf-8"))
+                healthy_ids = set(hdata.get("healthy", []))
+            except Exception:
+                pass
+
         free = [m for m in models if m["is_free"]]
         paid = [m for m in models if not m["is_free"]]
-        free.sort(key=lambda m: m["context_length"], reverse=True)
+
+        # If we have health data, put healthy models first
+        if healthy_ids:
+            healthy_free = [m for m in free if m["id"] in healthy_ids]
+            other_free = [m for m in free if m["id"] not in healthy_ids]
+            healthy_free.sort(key=lambda m: m["context_length"], reverse=True)
+            other_free.sort(key=lambda m: m["context_length"], reverse=True)
+            free = healthy_free + other_free
+        else:
+            free.sort(key=lambda m: m["context_length"], reverse=True)
+
         paid.sort(key=lambda m: m["context_length"], reverse=True)
         result = free[:20] + paid[:10]
         return JSONResponse(
@@ -670,6 +694,7 @@ def create_app() -> "FastAPI":  # type: ignore
                     "name": m["name"],
                     "is_free": m["is_free"],
                     "context_length": m["context_length"],
+                    "healthy": m["id"] in healthy_ids if healthy_ids else None,
                 }
                 for m in result
             ]
@@ -678,6 +703,18 @@ def create_app() -> "FastAPI":  # type: ignore
     @app.get("/api/jobs")
     async def list_jobs():
         return JSONResponse(store.list_all())
+
+    @app.post("/api/models/test")
+    async def test_models():
+        from .model_registry import get_verified_free_models
+
+        api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="No API key configured")
+        verified = get_verified_free_models(api_key, force=True)
+        return JSONResponse(
+            {"tested": len(verified), "healthy": [m["id"] for m in verified]}
+        )
 
     @app.get("/api/download/{job_id}/{fmt}")
     async def download(job_id: str, fmt: str):
