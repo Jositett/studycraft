@@ -83,7 +83,7 @@ def _validate_file(path: Path) -> None:
 @app.command()
 def generate(
     document: str = typer.Argument(
-        ..., help="Path to the document (PDF, DOCX, TXT, MD, RTF)"
+        ..., help="Path to the document (PDF, DOCX, TXT, MD, RTF, EPUB)"
     ),
     output: str = typer.Option("output", "--output", "-o", help="Output directory"),
     model: str = typer.Option(

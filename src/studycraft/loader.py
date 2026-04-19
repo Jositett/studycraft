@@ -1,7 +1,7 @@
 """
 StudyCraft – Document loader.
 
-Supports: .pdf  .docx  .txt  .md  .rtf
+Supports: .pdf  .docx  .txt  .md  .rtf  .epub
 Returns raw text regardless of source format.
 """
 
@@ -13,7 +13,7 @@ from rich.console import Console
 
 console = Console()
 
-SUPPORTED = {".pdf", ".docx", ".txt", ".md", ".rtf"}
+SUPPORTED = {".pdf", ".docx", ".txt", ".md", ".rtf", ".epub"}
 
 
 def load_document(path: Path) -> str:
@@ -37,6 +37,8 @@ def load_document(path: Path) -> str:
         return _load_docx(path)
     elif suffix == ".rtf":
         return _load_rtf(path)
+    elif suffix == ".epub":
+        return _load_epub(path)
     else:  # .txt / .md
         return path.read_text(encoding="utf-8", errors="replace")
 
@@ -69,6 +71,22 @@ def _load_rtf(path: Path) -> str:
 
     raw = path.read_text(encoding="utf-8", errors="replace")
     return rtf_to_text(raw)
+
+
+def _load_epub(path: Path) -> str:
+    from ebooklib import epub  # type: ignore
+    from ebooklib import ITEM_DOCUMENT  # type: ignore
+    import re
+
+    book = epub.read_epub(str(path), options={"ignore_ncx": True})
+    texts = []
+    for item in book.get_items_of_type(ITEM_DOCUMENT):
+        html = item.get_content().decode("utf-8", errors="replace")
+        clean = re.sub(r"<[^>]+>", " ", html)
+        clean = re.sub(r"\s+", " ", clean).strip()
+        if clean:
+            texts.append(clean)
+    return "\n\n".join(texts)
 
 
 # ── Utility ───────────────────────────────────────────────────────────────────

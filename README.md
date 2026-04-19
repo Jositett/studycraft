@@ -1,7 +1,7 @@
 # StudyCraft
 
 > **Craft structured, research-backed practice guides from any document.**
-> Upload a PDF, DOCX, TXT, RTF, or Markdown file -- StudyCraft auto-detects every chapter and subchapter, enriches each with live web research, and generates a complete study guide exportable to Markdown, HTML, PDF, DOCX, and EPUB.
+> Upload a PDF, DOCX, TXT, RTF, EPUB, or Markdown file -- StudyCraft auto-detects every chapter and subchapter, enriches each with live web research, and generates a complete study guide exportable to Markdown, HTML, PDF, DOCX, and EPUB.
 
 ---
 
@@ -97,7 +97,7 @@ studycraft models --refresh                                 # Force refresh from
 
 ## Supported Files
 
-PDF, DOCX, TXT, MD, RTF
+PDF, DOCX, TXT, MD, RTF, EPUB
 
 ---
 
@@ -120,7 +120,7 @@ docker compose up -d
 
 ## Output
 
-```
+```text
 output/
 ├── <Subject>_Practice_Guide.md
 ├── <Subject>_Practice_Guide.html
@@ -136,8 +136,8 @@ output/
 ## Environment Variables
 
 | Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENROUTER_API_KEY` | Yes | Get a free key at https://openrouter.ai |
+|-----------|----------|-------------|
+| `OPENROUTER_API_KEY` | Yes | Get a free key at [OpenRouter](https://openrouter.ai) |
 | `GITHUB_TOKEN` | No | For `studycraft gist` (gist scope) |
 
 ---

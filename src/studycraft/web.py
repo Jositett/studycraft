@@ -40,86 +40,162 @@ _HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StudyCraft — Practice Guide Generator</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root {
-    --primary: #2563eb; --accent: #7c3aed;
-    --bg: #f9fafb; --surface: #fff; --border: #e5e7eb;
-    --text: #111827; --muted: #6b7280;
+    --primary: #6d9fff; --primary-hover: #5a8af2; --accent: #a78bfa;
+    --bg: #0f1117; --surface: #1a1d2e; --surface-hover: #222640;
+    --border: #2a2f45; --border-hover: #3d4463;
+    --text: #e2e8f0; --muted: #8892b0;
+    --success: #4ade80; --error-bg: #2d1b1b; --error-border: #7f1d1d; --error-text: #fca5a5;
+    --radius: 12px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
   header {
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    color: white; padding: 1.5rem 2rem; text-align: center;
+    background: linear-gradient(135deg, #1e2540 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    color: white; padding: 2rem 2rem 1.75rem; text-align: center;
   }
-  header h1 { font-size: 1.8rem; font-weight: 800; }
-  header p { opacity: .8; margin-top: .25rem; }
+  header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; }
+  header h1 span { background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  header p { color: var(--muted); margin-top: .4rem; font-size: .95rem; }
 
-  main { max-width: 720px; margin: 2.5rem auto; padding: 0 1.5rem; }
+  main { max-width: 680px; margin: 2rem auto; padding: 0 1.25rem; }
 
   .card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    border-radius: var(--radius); padding: 1.75rem; margin-bottom: 1.25rem;
+    transition: border-color .2s;
   }
-  .card h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem; color: var(--primary); }
+  .card:hover { border-color: var(--border-hover); }
+  .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; color: var(--primary); letter-spacing: -.01em; }
 
-  label { display: block; font-size: .9rem; font-weight: 600; margin-bottom: .35rem; }
+  label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .35rem; color: var(--muted); }
   input[type=text], select {
-    width: 100%; padding: .6rem .9rem; border: 1px solid var(--border);
-    border-radius: 8px; font-size: .95rem; margin-bottom: 1rem;
-    outline: none; transition: border .2s;
+    width: 100%; padding: .6rem .85rem; border: 1px solid var(--border);
+    border-radius: 8px; font-size: .9rem; margin-bottom: 1rem;
+    outline: none; transition: border-color .2s, box-shadow .2s;
+    background: var(--bg); color: var(--text);
   }
-  input:focus, select:focus { border-color: var(--primary); }
+  select option { background: var(--surface); color: var(--text); }
+  input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(109,159,255,.15); }
+  input::placeholder { color: var(--muted); opacity: .6; }
 
   .drop-zone {
-    border: 2px dashed var(--border); border-radius: 10px;
-    padding: 2.5rem; text-align: center; cursor: pointer;
-    transition: border-color .2s, background .2s; margin-bottom: 1rem;
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 2.25rem 1.5rem; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; margin-bottom: 1.25rem;
   }
-  .drop-zone:hover, .drop-zone.active { border-color: var(--primary); background: #eff6ff; }
-  .drop-zone p { color: var(--muted); font-size: .9rem; margin-top: .5rem; }
+  .drop-zone:hover, .drop-zone.active { border-color: var(--primary); background: rgba(109,159,255,.06); }
+  .drop-zone.has-file { border-color: var(--success); border-style: solid; background: rgba(74,222,128,.05); }
+  .drop-zone p { color: var(--muted); font-size: .85rem; margin-top: .5rem; }
+  .drop-zone p strong { color: var(--primary); }
+  .drop-zone .formats { font-size: .75rem; opacity: .6; margin-top: .25rem; }
   .drop-zone input { display: none; }
-  .file-name { color: var(--primary); font-weight: 600; margin-top: .5rem; font-size: .9rem; }
+  .file-name { color: var(--success); font-weight: 600; margin-top: .5rem; font-size: .9rem; }
+
+  .checkbox-row {
+    display: inline-flex; align-items: center; gap: .5rem;
+    margin-bottom: 1rem; cursor: pointer; font-size: .9rem;
+  }
+  .checkbox-row input[type=checkbox] {
+    width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;
+  }
+
+  .context-hint { color: var(--muted); font-size: .75rem; margin: -.5rem 0 1rem; opacity: .7; }
 
   button[type=submit] {
-    width: 100%; padding: .85rem; background: var(--primary); color: white;
-    border: none; border-radius: 8px; font-size: 1rem; font-weight: 700;
-    cursor: pointer; transition: background .2s;
+    width: 100%; padding: .85rem; font-size: 1rem; font-weight: 700;
+    border: none; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: #fff; transition: opacity .2s, transform .1s;
   }
-  button[type=submit]:hover { background: #1d4ed8; }
-  button[type=submit]:disabled { background: var(--muted); cursor: not-allowed; }
+  button[type=submit]:hover { opacity: .9; }
+  button[type=submit]:active { transform: scale(.99); }
+  button[type=submit]:disabled { opacity: .4; cursor: not-allowed; transform: none; }
 
   .progress-card { display: none; }
   .progress-bar-wrap {
-    height: 8px; background: var(--border); border-radius: 99px; overflow: hidden; margin: 1rem 0;
+    height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; margin: 1rem 0;
   }
-  .progress-bar { height: 100%; background: var(--primary); width: 0%; transition: width .4s; }
-  .status-text { font-size: .9rem; color: var(--muted); }
+  .progress-bar {
+    height: 100%; width: 0%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transition: width .5s ease;
+  }
+  .status-text { font-size: .85rem; color: var(--muted); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+  .status-text.running { animation: pulse 2s ease-in-out infinite; }
 
   .results { display: none; }
+  .dl-grid { display: flex; flex-wrap: wrap; gap: .5rem; }
   .dl-btn {
-    display: inline-block; padding: .55rem 1.2rem; border-radius: 8px;
-    font-size: .9rem; font-weight: 600; text-decoration: none; margin-right: .5rem; margin-top: .5rem;
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .55rem 1.1rem; border-radius: 8px;
+    font-size: .85rem; font-weight: 600; text-decoration: none;
+    transition: opacity .2s, transform .1s; border: 1px solid var(--border);
+    background: var(--surface-hover); color: var(--text);
   }
-  .dl-md   { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
-  .dl-html { background: #eff6ff; color: var(--primary); border: 1px solid var(--primary); }
-  .dl-pdf  { background: var(--accent); color: white; }
+  .dl-btn:hover { opacity: .85; transform: translateY(-1px); }
+  .dl-pdf  { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .dl-html { background: rgba(109,159,255,.15); color: var(--primary); border-color: var(--primary); }
 
-  .error { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca;
-           border-radius: 8px; padding: .75rem 1rem; margin-top: 1rem; font-size: .9rem; }
+  .error {
+    color: var(--error-text); background: var(--error-bg); border: 1px solid var(--error-border);
+    border-radius: 8px; padding: .75rem 1rem; margin-top: 1rem; font-size: .85rem;
+  }
 
-  footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 2rem; }
+  .new-btn {
+    display: inline-block; margin-top: 1rem; padding: .5rem 1rem;
+    border-radius: 8px; font-size: .85rem; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--muted);
+    transition: border-color .2s;
+  }
+  .new-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  html { scrollbar-color: var(--border-hover) var(--bg); scrollbar-width: thin; }
+
+  /* Layout with aside */
+  .page-layout { display: flex; gap: 1.5rem; max-width: 1060px; margin: 2rem auto; padding: 0 1.25rem; align-items: flex-start; }
+  main { flex: 1; min-width: 0; margin: 0; padding: 0; max-width: none; }
+  aside {
+    width: 300px; flex-shrink: 0; position: sticky; top: 1.5rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.25rem; font-size: .8rem; color: var(--muted); line-height: 1.6;
+    max-height: calc(100vh - 3rem); overflow-y: auto;
+  }
+  aside h3 { color: var(--primary); font-size: .85rem; font-weight: 700; margin-bottom: .75rem; }
+  aside h4 { color: var(--text); font-size: .78rem; font-weight: 600; margin: .9rem 0 .3rem; }
+  aside p { margin-bottom: .5rem; }
+  aside ul { padding-left: 1rem; margin-bottom: .5rem; }
+  aside li { margin-bottom: .25rem; }
+  aside code { background: var(--bg); padding: .1rem .35rem; border-radius: 4px; font-size: .75rem; }
+  aside hr { border: none; border-top: 1px solid var(--border); margin: .75rem 0; }
+
+  @media (max-width: 860px) {
+    .page-layout { flex-direction: column; }
+    aside { width: 100%; position: static; max-height: none; }
+  }
+
+  footer { text-align: center; color: var(--muted); font-size: .75rem; padding: 2rem; opacity: .6; }
+  footer a { color: var(--primary); text-decoration: none; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>📖 StudyCraft</h1>
+  <h1>📖 <span>StudyCraft</span></h1>
   <p>Craft structured, research-backed practice guides from any document</p>
 </header>
 
+<div class="page-layout">
 <main>
   <div class="card" id="upload-card">
     <h2>Generate a Practice Guide</h2>
@@ -129,54 +205,136 @@ _HTML = """<!DOCTYPE html>
         <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12V4m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <p>Drag & drop your document here, or <strong>click to browse</strong></p>
-      <p>PDF · DOCX · TXT · MD · RTF</p>
-      <input type="file" id="file-input" accept=".pdf,.docx,.txt,.md,.rtf">
+      <p>PDF · DOCX · TXT · MD · RTF · EPUB</p>
+      <input type="file" id="file-input" accept=".pdf,.docx,.txt,.md,.rtf,.epub">
       <div class="file-name" id="file-name"></div>
     </div>
 
     <label for="subject-input">Subject name (optional — auto-detected if blank)</label>
     <input type="text" id="subject-input" placeholder="e.g. Advanced Java, Calculus II, History of Art">
 
-    <label for="answers-check" style="display:inline-flex;align-items:center;gap:.5rem;margin-bottom:1rem;cursor:pointer">
-      <input type="checkbox" id="answers-check" style="width:1.1rem;height:1.1rem">
+    <label for="answers-check" class="checkbox-row">
+      <input type="checkbox" id="answers-check">
       Generate answer key
     </label>
 
     <label for="context-input">Additional context files (optional)</label>
-    <input type="file" id="context-input" multiple accept=".pdf,.docx,.txt,.md,.rtf"
-      style="margin-bottom:1rem;font-size:.9rem">
-    <p style="color:var(--muted);font-size:.8rem;margin:-0.5rem 0 1rem">Extra files indexed into RAG for richer context (not generated as chapters)</p>
+    <input type="file" id="context-input" multiple accept=".pdf,.docx,.txt,.md,.rtf,.epub"
+      style="margin-bottom:.75rem;font-size:.85rem;color:var(--muted)">
+    <p class="context-hint">Extra files indexed into RAG for richer context (not generated as chapters)</p>
 
     <label for="model-select">Model</label>
-    <select id="model-select">
-      <option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B (Free · Fast)</option>
-      <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (Free · Better quality)</option>
-      <option value="mistralai/mistral-7b-instruct:free">Mistral 7B (Free · Alternate)</option>
-      <option value="google/gemma-3-27b-it:free">Gemma 3 27B (Free · Good)</option>
-      <option value="anthropic/claude-3-5-haiku">Claude 3.5 Haiku (Paid · Excellent)</option>
-      <option value="openai/gpt-4o-mini">GPT-4o Mini (Paid · Very good)</option>
-    </select>
+    <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+      <select id="model-select" style="margin-bottom:0;flex:1">
+        <option value="" disabled selected>Loading models…</option>
+      </select>
+      <button type="button" id="refresh-models-btn" onclick="refreshModels()" title="Refresh models" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.4rem .6rem;cursor:pointer;color:var(--muted);transition:border-color .2s,color .2s;display:flex;align-items:center">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
 
     <button type="submit" id="generate-btn" onclick="startGeneration()">Generate Guide</button>
     <div class="error" id="error-msg" style="display:none"></div>
   </div>
 
   <div class="card progress-card" id="progress-card">
-    <h2>⚙ Generating your guide…</h2>
+    <h2>⚙️ Generating your guide…</h2>
     <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
-    <div class="status-text" id="status-text">Starting up…</div>
+    <div class="status-text running" id="status-text">Starting up…</div>
   </div>
 
   <div class="card results" id="results-card">
     <h2>✅ Guide Ready!</h2>
-    <p style="color:#6b7280;margin-bottom:1rem">Download your practice guide in your preferred format:</p>
-    <div id="download-links"></div>
+    <p style="color:var(--muted);margin-bottom:1rem;font-size:.9rem">Download your practice guide:</p>
+    <div class="dl-grid" id="download-links"></div>
+    <button class="new-btn" onclick="resetUI()">Generate another</button>
   </div>
 </main>
+
+<aside>
+  <h3>📘 Usage Guide</h3>
+
+  <h4>📄 Upload Document</h4>
+  <p>Drag & drop or click to select your source file. Supported formats:</p>
+  <ul>
+    <li><code>PDF</code> — textbooks, papers, slides</li>
+    <li><code>DOCX</code> — Word documents</li>
+    <li><code>EPUB</code> — e-books</li>
+    <li><code>TXT</code> / <code>MD</code> — plain text or Markdown</li>
+    <li><code>RTF</code> — rich text format</li>
+  </ul>
+
+  <hr>
+  <h4>✏️ Subject Name</h4>
+  <p>Optional. If left blank, StudyCraft auto-detects the subject from your document content.</p>
+
+  <hr>
+  <h4>✅ Answer Key</h4>
+  <p>When checked, a separate answer key file is generated alongside the practice guide with solutions to all quiz questions.</p>
+
+  <hr>
+  <h4>📎 Context Files</h4>
+  <p>Add supplementary files (lecture notes, references) that get indexed into RAG for richer, more accurate content. These are <em>not</em> turned into chapters.</p>
+
+  <hr>
+  <h4>🤖 Model Selection</h4>
+  <p>Choose an AI model from OpenRouter. Free models work well for most documents. Paid models produce higher quality for complex subjects.</p>
+  <p>Click the <strong>↻</strong> button to refresh the model list from the API (cached 24h).</p>
+
+  <hr>
+  <h4>📥 Output Formats</h4>
+  <p>Once generated, download your guide in:</p>
+  <ul>
+    <li><code>MD</code> — Markdown source</li>
+    <li><code>HTML</code> — styled web page</li>
+    <li><code>PDF</code> — print-ready document</li>
+    <li><code>DOCX</code> — Word format</li>
+    <li><code>EPUB</code> — e-reader format</li>
+  </ul>
+
+  <hr>
+  <h4>💡 Tips</h4>
+  <ul>
+    <li>Larger documents produce more chapters</li>
+    <li>Well-structured docs (with headings) yield better outlines</li>
+    <li>Use context files for supplementary material</li>
+    <li>Free models have rate limits — generation may take a few minutes</li>
+  </ul>
+</aside>
+</div>
 
 <footer>StudyCraft · AI-powered practice guides · <a href="/docs">API docs</a></footer>
 
 <script>
+  async function loadModels(refresh = false) {
+    const sel = document.getElementById('model-select');
+    sel.innerHTML = '<option value="" disabled selected>Loading models…</option>';
+    try {
+      const url = refresh ? '/api/models?refresh=1' : '/api/models';
+      const r = await fetch(url);
+      const models = await r.json();
+      sel.innerHTML = '';
+      models.forEach((m, i) => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        const ctx = m.context_length ? `${Math.round(m.context_length/1000)}k` : '';
+        const cost = m.is_free ? 'Free' : 'Paid';
+        opt.textContent = `${m.name} (${cost}${ctx ? ' \u00b7 ' + ctx : ''})`;
+        if (i === 0) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    } catch(e) {
+      sel.innerHTML = '<option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B (Free)</option>';
+    }
+  }
+  function refreshModels() {
+    const btn = document.getElementById('refresh-models-btn');
+    btn.style.color = 'var(--primary)';
+    btn.style.borderColor = 'var(--primary)';
+    loadModels(true).then(() => { btn.style.color = ''; btn.style.borderColor = ''; });
+  }
+  loadModels();
+
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('file-input');
   const fileName  = document.getElementById('file-name');
@@ -189,10 +347,12 @@ _HTML = """<!DOCTYPE html>
     e.preventDefault(); dropZone.classList.remove('active');
     selectedFile = e.dataTransfer.files[0];
     fileName.textContent = selectedFile.name;
+    dropZone.classList.add('has-file');
   });
   fileInput.addEventListener('change', () => {
     selectedFile = fileInput.files[0];
     fileName.textContent = selectedFile ? selectedFile.name : '';
+    dropZone.classList.toggle('has-file', !!selectedFile);
   });
 
   async function startGeneration() {
@@ -259,11 +419,24 @@ _HTML = """<!DOCTYPE html>
     const links = document.getElementById('download-links');
     links.innerHTML = '';
     for (const [fmt, path] of Object.entries(files)) {
-      const cls = fmt === 'pdf' ? 'dl-pdf' : fmt === 'html' ? 'dl-html' : 'dl-md';
-      links.innerHTML += `<a class="dl-btn ${cls}" href="/api/download/${jobId}/${fmt}" download>
-        Download ${fmt.toUpperCase()}
-      </a>`;
+      const cls = fmt === 'pdf' ? 'dl-pdf' : fmt === 'html' ? 'dl-html' : 'dl-btn';
+      links.innerHTML += `<a class="dl-btn ${cls}" href="/api/download/${jobId}/${fmt}" download>⬇ ${fmt.toUpperCase()}</a>`;
     }
+  }
+
+  function resetUI() {
+    selectedFile = null;
+    fileName.textContent = '';
+    fileInput.value = '';
+    dropZone.classList.remove('has-file');
+    document.getElementById('subject-input').value = '';
+    document.getElementById('answers-check').checked = false;
+    document.getElementById('generate-btn').disabled = false;
+    document.getElementById('upload-card').style.opacity = '1';
+    document.getElementById('results-card').style.display = 'none';
+    document.getElementById('progress-card').style.display = 'none';
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('error-msg').style.display = 'none';
   }
 </script>
 </body>
@@ -282,6 +455,11 @@ def create_app() -> "FastAPI":  # type: ignore
 
     app = FastAPI(title="StudyCraft", version="0.6.0")
     store = JobStore(db_path=OUTPUT_DIR / "jobs.db")
+
+    @app.get("/favicon.svg")
+    async def favicon():
+        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">\U0001f4d6</text></svg>'
+        return HTMLResponse(content=svg, media_type="image/svg+xml")
 
     @app.get("/", response_class=HTMLResponse)
     async def index():
@@ -331,6 +509,17 @@ def create_app() -> "FastAPI":  # type: ignore
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         return JSONResponse(job)
+
+    @app.get("/api/models")
+    async def list_models(refresh: bool = False):
+        from .model_registry import fetch_models
+        models = fetch_models(force=refresh)
+        free = [m for m in models if m["is_free"]]
+        paid = [m for m in models if not m["is_free"]]
+        free.sort(key=lambda m: m["context_length"], reverse=True)
+        paid.sort(key=lambda m: m["context_length"], reverse=True)
+        result = free[:20] + paid[:10]
+        return JSONResponse([{"id": m["id"], "name": m["name"], "is_free": m["is_free"], "context_length": m["context_length"]} for m in result])
 
     @app.get("/api/jobs")
     async def list_jobs():
