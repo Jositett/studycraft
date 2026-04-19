@@ -55,3 +55,10 @@ def test_export_base_name(tmp_path: Path):
     paths = export_all(_SAMPLE_MD, tmp_path, base_name="Custom_Name")
     assert paths["md"].name == "Custom_Name.md"
     assert paths["html"].name == "Custom_Name.html"
+
+
+def test_export_creates_docx(tmp_path: Path):
+    paths = export_all(_SAMPLE_MD, tmp_path, base_name="Test_Guide")
+    assert "docx" in paths
+    assert paths["docx"].exists()
+    assert paths["docx"].name == "Test_Guide.docx"

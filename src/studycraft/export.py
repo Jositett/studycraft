@@ -198,6 +198,15 @@ def export_all(
             "  Tip: open the HTML in Chrome → Ctrl+P → Save as PDF"
         )
 
+    # ── DOCX ──────────────────────────────────────────────────────────────────
+    try:
+        from .export_docx import export_docx
+        docx_path = output_dir / f"{base_name}.docx"
+        export_docx(full_markdown, docx_path)
+        paths["docx"] = docx_path
+    except Exception as exc:
+        console.print(f"[yellow]\u26a0 DOCX skipped:[/yellow] {exc}")
+
     return paths
 
 

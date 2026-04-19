@@ -1,25 +1,10 @@
 # Task Tracker
 
-## Current Sprint — v0.5.0
+## Current Sprint — v0.6.0
 
-### Phase 4.2 — Richer RAG
-- [ ] Benchmark `all-mpnet-base-v2` vs `all-MiniLM-L6-v2`
-- [ ] Store chunk metadata: chapter number, page number, source file
-- [ ] `studycraft inspect --rag` — show RAG chunks per chapter
-
-### Phase 5.1 — Additional Export Formats
-- [ ] DOCX export (python-docx)
+### Phase 5.1 — Additional Export Formats (remaining)
 - [ ] EPUB export
 - [ ] Anki flashcard deck (.apkg)
-
-### Phase 6.1 — Parallel Generation
-- [ ] `asyncio.gather` for concurrent chapter generation
-- [ ] Token budget manager
-- [ ] `--workers N` flag
-
----
-
-## Backlog
 
 ### Phase 5.2 — Integrations
 - [ ] Notion API — push guide chapters as Notion pages
@@ -33,14 +18,30 @@
 
 ---
 
+## Backlog
+
+### Phase 4.3 — Image Extraction
+- [ ] Extract images from PDF/DOCX and describe via vision model
+- [ ] Include diagram descriptions in chapter context
+
+---
+
 ## Completed
+
+### v0.5.0 — Richer RAG, DOCX Export & Parallel Generation ✅
+- [x] RAG chunk metadata (source, chunk_index)
+- [x] `query_detailed()` and `chunk_count()` methods on RAGIndex
+- [x] `studycraft inspect --rag` — show RAG chunks per chapter
+- [x] DOCX export via `export_docx.py` in pipeline
+- [x] Parallel generation with `--workers N` / `-w N` (ThreadPoolExecutor)
+- [x] 47 tests passing (1 new)
 
 ### v0.4.0 — Multi-file RAG, SQLite Jobs & Better Detection ✅
 - [x] `--context` / `-x` CLI flag for supplementary RAG files
 - [x] Web UI multi-file context upload
 - [x] SQLite job store (`jobstore.py`) replacing in-memory dict
 - [x] Auto-cleanup of jobs older than 24h
-- [x] Roman numeral chapter detection (I, II, III, IV…)
+- [x] Roman numeral chapter detection (I, II, III, IV...)
 - [x] Appendix/glossary/bibliography/references filtering
 - [x] 46 tests passing (7 new)
 
@@ -57,7 +58,7 @@
 - [x] Auto-retry on validation failure (higher temperature)
 - [x] `studycraft validate` CLI command
 - [x] Engine progress callback for chapter-level updates
-- [x] Web UI real-time chapter progress (10–95% granularity)
+- [x] Web UI real-time chapter progress (10-95% granularity)
 - [x] Answer key generation via `--with-answers` flag
 
 ### v0.1.0 — Core Pipeline ✅
@@ -67,6 +68,6 @@
 - [x] Web research (DuckDuckGo)
 - [x] LLM generation via OpenRouter
 - [x] Per-chapter cache + crash recovery
-- [x] Export: MD → HTML → PDF
+- [x] Export: MD -> HTML -> PDF
 - [x] CLI (generate, inspect, export, models)
 - [x] Web UI scaffold

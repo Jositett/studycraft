@@ -2,6 +2,21 @@
 
 All notable changes to StudyCraft will be documented in this file.
 
+## [0.5.0] — 2025-01-20
+
+### Added
+- Richer RAG: chunk metadata (source, chunk_index), `query_detailed()`, `chunk_count()`
+- `studycraft inspect --rag` flag — indexes document and shows top RAG chunks per chapter
+- DOCX export via `export_docx.py` — automatically included in export pipeline
+- Parallel chapter generation with `--workers N` / `-w N` flag (ThreadPoolExecutor)
+- 1 new test: DOCX export verification (47 total)
+
+### Changed
+- `rag.py` — metadatas now include `chunk_index`; new `query_detailed()` and `chunk_count()` methods
+- `engine.py` — refactored generation into `_generate_all()` supporting sequential and parallel modes
+- `export.py` — pipeline now produces `.docx` alongside `.md`, `.html`, `.pdf`
+- `cli.py` — added `--workers` flag to `generate`, `--rag` flag to `inspect`
+
 ## [0.4.0] — 2025-01-20
 
 ### Added
@@ -41,13 +56,13 @@ All notable changes to StudyCraft will be documented in this file.
 - Auto-retry on validation failure with higher temperature
 - `studycraft validate <guide.md>` CLI command
 - Progress callback in engine for chapter-level updates
-- Web UI now shows "Generating chapter N of M…" with granular progress bar
+- Web UI now shows "Generating chapter N of M..." with granular progress bar
 - Answer key generation (`--with-answers` flag) — second LLM pass produces `Answer_Key.md`
 
 ### Changed
 - `engine.py` — `_generate_chapter` now accepts `temperature` parameter; new `_generate_chapter_with_retry` wrapper
 - `engine.py` — `run()` accepts `on_progress` callback and `with_answers` flag
-- `web.py` — background job runner wires progress callback (10–95% range)
+- `web.py` — background job runner wires progress callback (10-95% range)
 
 ## [0.1.0] — 2025-01-20
 
@@ -59,7 +74,7 @@ All notable changes to StudyCraft will be documented in this file.
 - LLM generation via OpenRouter (any model, configurable)
 - Universal 8-section practice guide template
 - Per-chapter cache + `--resume-from` crash recovery
-- Export pipeline: Markdown → styled HTML → PDF
+- Export pipeline: Markdown -> styled HTML -> PDF
 - Typer CLI with Rich output and progress bars
 - Web UI scaffold (FastAPI + drag-and-drop, background jobs, polling)
 - `uv`-managed project with editable install + optional web deps

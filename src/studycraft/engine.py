@@ -1,8 +1,8 @@
 """
 StudyCraft – Core engine.
 
-Orchestrates: document loading → chapter detection → RAG indexing
-              → web research → LLM generation → export.
+Orchestrates: document loading -> chapter detection -> RAG indexing
+              -> web research -> LLM generation -> export.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from openai import OpenAI
@@ -63,7 +64,7 @@ class StudyCraft:
         self.rate_limit_seconds = rate_limit_seconds
         self.rag = RAGIndex(persist_dir=rag_dir)
 
-    # ── Public API ────────────────────────────────────────────────────────────
+    # -- Public API ------------------------------------------------------------
 
     def run(
         self,
@@ -74,9 +75,10 @@ class StudyCraft:
         with_answers: bool = False,
         on_progress: ProgressCallback = None,
         context_files: list[str | Path] | None = None,
+        workers: int = 1,
     ) -> dict[str, Path]:
         """
-        Full pipeline: load → detect → index → generate → export.
+        Full pipeline: load -> detect -> index -> generate -> export.
 
         Args:
             document_path: Path to any supported document.
@@ -84,6 +86,7 @@ class StudyCraft:
             resume_from: Skip chapter numbers below this (uses cache).
             only_chapter: Generate only this one chapter (by number).
             context_files: Extra documents to index into RAG (not generated).
+            workers: Number of parallel workers for chapter generation.
         """
         doc_path = Path(document_path)
 
@@ -94,10 +97,10 @@ class StudyCraft:
 
         # 2. Detect subject name
         doc_subject = subject or _infer_subject(doc_path, raw_text)
-        console.print(f"[bold cyan]📚 Subject:[/bold cyan] {doc_subject}")
+        console.print(f"[bold cyan]Subject:[/bold cyan] {doc_subject}")
 
         # 3. Detect chapters
-        console.print("[cyan]🔍 Detecting chapters…[/cyan]")
+        console.print("[cyan]Detecting chapters...[/cyan]")
         chapters = detect_chapters(raw_text)
         if not chapters:
             raise ValueError(
@@ -117,13 +120,11 @@ class StudyCraft:
                 ctx_text = load_document(ctx_path)
                 self.rag.index(ctx_text, source_name=ctx_path.stem)
             except Exception as exc:
-                console.print(f"  [yellow]⚠ Skipping context file {ctx_path.name}: {exc}[/yellow]")
+                console.print(f"  [yellow]Skipping context file {ctx_path.name}: {exc}[/yellow]")
 
         # 5. Generate per chapter
         cache_dir = self.output_dir / ".cache"
         cache_dir.mkdir(exist_ok=True)
-
-        generated: list[str] = []
 
         targets = (
             chapters
@@ -131,47 +132,20 @@ class StudyCraft:
             else [ch for ch in chapters if int(ch["num"].split(".")[0]) == only_chapter]
         )
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Generating chapters…", total=len(targets))
-
-            for idx, ch in enumerate(targets):
-                ch_num = ch["num"]
-                cache_file = cache_dir / f"ch{ch_num.replace('.', '_')}.md"
-                msg = f"Generating chapter {idx + 1} of {len(targets)}: {ch['title'][:40]}"
-
-                if on_progress:
-                    on_progress(idx, len(targets), msg)
-
-                if int(ch_num.split(".")[0]) < resume_from and cache_file.exists():
-                    progress.print(f"[dim]⏩ Ch {ch_num} — from cache[/dim]")
-                    generated.append(cache_file.read_text(encoding="utf-8"))
-                    progress.advance(task)
-                    continue
-
-                progress.update(task, description=f"Ch {ch_num}: {ch['title'][:40]}…")
-                content = self._generate_chapter_with_retry(ch, doc_subject)
-                cache_file.write_text(content, encoding="utf-8")
-                generated.append(content)
-                progress.advance(task)
-
-                if ch is not targets[-1]:
-                    time.sleep(self.rate_limit_seconds)
+        generated = self._generate_all(
+            targets, doc_subject, cache_dir, resume_from, on_progress, workers
+        )
 
         # 6. Answer key (optional)
         if with_answers:
             if on_progress:
-                on_progress(len(targets), len(targets), "Generating answer key…")
-            console.print("[cyan]📝 Generating answer key…[/cyan]")
+                on_progress(len(targets), len(targets), "Generating answer key...")
+            console.print("[cyan]Generating answer key...[/cyan]")
             answer_key = self._generate_answer_key(generated, doc_subject)
-            ak_path = self.output_dir / f"{re.sub(r'[^\w\s-]', '', doc_subject).strip().replace(' ', '_')}_Answer_Key.md"
+            safe = re.sub(r'[^\w\s-]', '', doc_subject).strip().replace(' ', '_')
+            ak_path = self.output_dir / f"{safe}_Answer_Key.md"
             ak_path.write_text(answer_key, encoding="utf-8")
-            console.print(f"[green]✓ Answer Key[/green] → {ak_path}")
+            console.print(f"[green]Answer Key[/green] -> {ak_path}")
 
         # 7. Export
         combined = "\n\n---\n\n".join(generated)
@@ -182,7 +156,67 @@ class StudyCraft:
             combined, self.output_dir, base_name=f"{safe_name}_Practice_Guide"
         )
 
-    # ── Chapter generation ────────────────────────────────────────────────────
+    # -- Generation (sequential or parallel) -----------------------------------
+
+    def _generate_all(
+        self,
+        targets: list[Chapter],
+        subject: str,
+        cache_dir: Path,
+        resume_from: int,
+        on_progress: ProgressCallback,
+        workers: int,
+    ) -> list[str]:
+        """Generate all target chapters, sequentially or in parallel."""
+
+        def _gen_one(idx: int, ch: Chapter) -> tuple[int, str]:
+            ch_num = ch["num"]
+            cache_file = cache_dir / f"ch{ch_num.replace('.', '_')}.md"
+            if int(ch_num.split(".")[0]) < resume_from and cache_file.exists():
+                return idx, cache_file.read_text(encoding="utf-8")
+            content = self._generate_chapter_with_retry(ch, subject)
+            cache_file.write_text(content, encoding="utf-8")
+            return idx, content
+
+        generated = [""] * len(targets)
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Generating chapters...", total=len(targets))
+
+            if workers > 1 and len(targets) > 1:
+                console.print(f"[cyan]Parallel mode: {workers} workers[/cyan]")
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    futures = [pool.submit(_gen_one, i, ch) for i, ch in enumerate(targets)]
+                    for future in futures:
+                        idx, content = future.result()
+                        generated[idx] = content
+                        msg = f"Completed chapter {idx + 1} of {len(targets)}"
+                        if on_progress:
+                            on_progress(idx + 1, len(targets), msg)
+                        progress.advance(task)
+            else:
+                for idx, ch in enumerate(targets):
+                    msg = f"Generating chapter {idx + 1} of {len(targets)}: {ch['title'][:40]}"
+                    if on_progress:
+                        on_progress(idx, len(targets), msg)
+                    progress.update(task, description=f"Ch {ch['num']}: {ch['title'][:40]}...")
+
+                    _, content = _gen_one(idx, ch)
+                    generated[idx] = content
+                    progress.advance(task)
+
+                    if ch is not targets[-1]:
+                        time.sleep(self.rate_limit_seconds)
+
+        return generated
+
+    # -- Chapter generation ----------------------------------------------------
 
     def _generate_chapter_with_retry(
         self, chapter: Chapter, subject: str, max_retries: int = 1
@@ -194,19 +228,19 @@ class StudyCraft:
         if result.passed or max_retries < 1:
             if not result.passed:
                 console.print(
-                    f"  [yellow]⚠ Ch {chapter['num']} validation:[/yellow] {result.summary()}"
+                    f"  [yellow]Ch {chapter['num']} validation:[/yellow] {result.summary()}"
                 )
             return content
 
         console.print(
-            f"  [yellow]⚠ Ch {chapter['num']} failed validation ({result.summary()}) — retrying…[/yellow]"
+            f"  [yellow]Ch {chapter['num']} failed validation ({result.summary()}) -- retrying...[/yellow]"
         )
         time.sleep(self.rate_limit_seconds)
         content = self._generate_chapter(chapter, subject, temperature=0.5)
         retry_result = validate_chapter(content, label=f"Ch {chapter['num']}")
         if not retry_result.passed:
             console.print(
-                f"  [yellow]⚠ Ch {chapter['num']} retry still has issues:[/yellow] {retry_result.summary()}"
+                f"  [yellow]Ch {chapter['num']} retry still has issues:[/yellow] {retry_result.summary()}"
             )
         return content
 
@@ -272,11 +306,11 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
 </template>
 
 <rules>
-- Use the exact subject "{subject}" throughout — no generic placeholders
+- Use the exact subject "{subject}" throughout -- no generic placeholders
 - Examples must use the format described in format_instructions
 - All 10 quiz questions must be filled in with real questions
 - Keep examples practical and realistic, not toy/trivial examples
-- Do not reproduce the placeholder text — replace it entirely
+- Do not reproduce the placeholder text -- replace it entirely
 - Output ONLY the filled template, nothing else
 </rules>"""
 
@@ -293,20 +327,18 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
             content = re.sub(r"\n```$", "", content)
             return content
         except Exception as exc:
-            console.print(f"  [red]✗ LLM error ch {chapter['num']}: {exc}[/red]")
+            console.print(f"  [red]LLM error ch {chapter['num']}: {exc}[/red]")
             return (
                 f"# Chapter {chapter['num']}: {chapter['title']}\n\n"
                 f"<!-- Generation failed: {exc} -->\n"
             )
 
-
-    # ── Answer key generation ─────────────────────────────────────────────────
+    # -- Answer key generation -------------------------------------------------
 
     def _generate_answer_key(
         self, chapter_contents: list[str], subject: str
     ) -> str:
         """Generate an answer key from all chapter quiz questions and exercises."""
-        # Extract quiz + exercise sections from each chapter
         sections = []
         for content in chapter_contents:
             for heading in ("Chapter Quiz", "Practice Exercises"):
@@ -316,7 +348,7 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                     sections.append(f"### {heading}\n{section_text}")
 
         if not sections:
-            return f"# Answer Key — {subject}\n\nNo quiz questions or exercises found."
+            return f"# Answer Key -- {subject}\n\nNo quiz questions or exercises found."
 
         prompt = f"""You are an expert educator. Generate a complete answer key for the following quiz questions and practice exercises from a {subject} study guide.
 
@@ -337,12 +369,12 @@ Format as clean Markdown with clear numbering."""
                 max_tokens=4500,
             )
             body = resp.choices[0].message.content.strip()
-            return f"# 🔑 Answer Key — {subject}\n\n{body}"
+            return f"# Answer Key -- {subject}\n\n{body}"
         except Exception as exc:
-            return f"# Answer Key — {subject}\n\n<!-- Generation failed: {exc} -->"
+            return f"# Answer Key -- {subject}\n\n<!-- Generation failed: {exc} -->"
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 
 
 def _infer_subject(doc_path: Path, text: str) -> str:
@@ -350,10 +382,8 @@ def _infer_subject(doc_path: Path, text: str) -> str:
     Guess the subject from the filename or first non-empty line of text.
     Falls back to the filename stem.
     """
-    # Try first meaningful line
     for line in text.splitlines():
         stripped = line.strip()
         if stripped and len(stripped) < 100:
             return stripped
-    # Fall back to filename
     return doc_path.stem.replace("_", " ").replace("-", " ").title()

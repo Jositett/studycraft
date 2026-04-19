@@ -118,6 +118,12 @@ def generate(
         "-x",
         help="Extra files to index into RAG for richer context (not generated)",
     ),
+    workers: int = typer.Option(
+        1,
+        "--workers",
+        "-w",
+        help="Number of parallel workers for chapter generation",
+    ),
     clear_cache: bool = typer.Option(
         False,
         "--clear-cache",
@@ -165,6 +171,7 @@ def generate(
             only_chapter=chapter,
             with_answers=with_answers,
             context_files=context,
+            workers=workers,
         )
     except ValueError as exc:
         console.print(f"[red]✗ Error:[/red] {exc}")
@@ -178,6 +185,9 @@ def generate(
 @app.command()
 def inspect(
     document: str = typer.Argument(..., help="Path to the document"),
+    rag: bool = typer.Option(
+        False, "--rag", help="Also index into RAG and show which chunks match each chapter"
+    ),
 ) -> None:
     """[bold]Inspect[/bold] a document — show detected chapters without generating."""
     doc_path = Path(document)
@@ -203,6 +213,29 @@ def inspect(
 
     console.print(table)
     console.print(f"\n[green]Total:[/green] {len(chapters)} chapters")
+
+    if rag:
+        from .rag import RAGIndex
+
+        console.print("\n[cyan]Indexing into RAG…[/cyan]")
+        idx = RAGIndex()
+        idx.clear()
+        idx.index(text, source_name=doc_path.stem)
+        console.print(f"[green]Total chunks:[/green] {idx.chunk_count()}\n")
+
+        for ch in chapters:
+            sub_titles = " ".join(s["title"] for s in ch["subchapters"])
+            query = f"{ch['title']} {sub_titles}"
+            hits = idx.query_detailed(query, n_results=3)
+            console.print(f"[bold]Ch {ch['num']}: {ch['title']}[/bold]")
+            if not hits:
+                console.print("  [dim]No matching chunks[/dim]")
+            for h in hits:
+                console.print(
+                    f"  [dim]chunk {h['chunk_index']} from {h['source']} "
+                    f"(dist={h['distance']}):[/dim] {h['text'][:120]}"
+                )
+            console.print()
 
 
 @app.command()
