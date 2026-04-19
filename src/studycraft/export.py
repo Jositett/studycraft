@@ -64,7 +64,7 @@ pre {{
   background: {t.code_bg}; color: {t.code_fg};
   padding: 1.25rem 1.5rem; border-radius: 10px; overflow-x: auto;
   margin: 1.25rem 0; font-size: 0.875rem; line-height: 1.6;
-  border: 1px solid {t.border};
+  border: 1px solid {t.border}; position: relative;
 }}
 code {{
   font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
@@ -72,6 +72,40 @@ code {{
   padding: 0.15em 0.45em; border-radius: 4px; font-size: 0.9em;
 }}
 pre code {{ background: none; color: inherit; padding: 0; }}
+
+/* Copy button */
+.copy-btn {{
+  position: absolute; top: 8px; right: 8px;
+  background: {t.surface}; color: {t.muted}; border: 1px solid {t.border};
+  border-radius: 6px; padding: 4px 10px; font-size: 0.75rem;
+  cursor: pointer; opacity: 0; transition: opacity 0.2s, background 0.15s;
+  font-family: inherit; z-index: 1;
+}}
+pre:hover .copy-btn {{ opacity: 1; }}
+.copy-btn:hover {{ background: {t.border}; color: {t.text}; }}
+.copy-btn.copied {{ color: {t.primary}; }}
+
+/* Syntax highlighting (Pygments codehilite classes) */
+.codehilite {{ background: {t.code_bg}; border-radius: 10px; }}
+.codehilite pre {{ background: transparent; border: none; margin: 0; }}
+.codehilite .k, .codehilite .kn, .codehilite .kd, .codehilite .kc,
+.codehilite .kr, .codehilite .kt {{ color: {t.syn_keyword}; font-weight: 600; }}
+.codehilite .s, .codehilite .s1, .codehilite .s2, .codehilite .sa,
+.codehilite .sb, .codehilite .sc, .codehilite .sd, .codehilite .se,
+.codehilite .sh, .codehilite .si, .codehilite .sr, .codehilite .ss {{ color: {t.syn_string}; }}
+.codehilite .c, .codehilite .c1, .codehilite .cm, .codehilite .cs,
+.codehilite .ch, .codehilite .cp, .codehilite .cpf {{ color: {t.syn_comment}; font-style: italic; }}
+.codehilite .nf, .codehilite .fm, .codehilite .nv {{ color: {t.syn_function}; }}
+.codehilite .nc, .codehilite .nn {{ color: {t.syn_class}; font-weight: 600; }}
+.codehilite .mi, .codehilite .mf, .codehilite .mh, .codehilite .mo,
+.codehilite .mb, .codehilite .il {{ color: {t.syn_number}; }}
+.codehilite .o, .codehilite .ow {{ color: {t.syn_operator}; }}
+.codehilite .nb, .codehilite .bp {{ color: {t.syn_builtin}; }}
+.codehilite .p {{ color: {t.code_fg}; }}
+.codehilite .n, .codehilite .na, .codehilite .nd, .codehilite .ni,
+.codehilite .ne, .codehilite .nl, .codehilite .no, .codehilite .nt {{ color: {t.code_fg}; }}
+.codehilite .gd {{ color: #f44747; }}
+.codehilite .gi {{ color: #4ec9b0; }}
 
 blockquote {{
   border-left: 4px solid {t.quote_border}; background: {t.quote_bg};
@@ -140,6 +174,16 @@ blockquote {{ border-left: 3px solid {t.quote_border}; padding-left: 12px; color
 table {{ border-collapse: collapse; width: 100%; }}
 th {{ background: {t.th_bg}; color: {t.th_fg}; padding: 6px 10px; text-align: left; }}
 td {{ padding: 6px 10px; border-bottom: 1px solid {t.td_border}; }}
+.codehilite {{ background: {t.code_bg}; border-radius: 6px; }}
+.codehilite pre {{ background: transparent; border: none; margin: 0; }}
+.codehilite .k, .codehilite .kn, .codehilite .kd {{ color: {t.syn_keyword}; font-weight: bold; }}
+.codehilite .s, .codehilite .s1, .codehilite .s2 {{ color: {t.syn_string}; }}
+.codehilite .c, .codehilite .c1, .codehilite .cm {{ color: {t.syn_comment}; font-style: italic; }}
+.codehilite .nf, .codehilite .fm {{ color: {t.syn_function}; }}
+.codehilite .nc, .codehilite .nn {{ color: {t.syn_class}; }}
+.codehilite .mi, .codehilite .mf {{ color: {t.syn_number}; }}
+.codehilite .nb, .codehilite .bp {{ color: {t.syn_builtin}; }}
+.codehilite .o, .codehilite .ow {{ color: {t.syn_operator}; }}
 """
 
 
@@ -193,7 +237,10 @@ def export_all(
 
     # ── HTML ──────────────────────────────────────────────────────────────────
     md_ext = md_lib.Markdown(
-        extensions=["tables", "fenced_code", "toc", "nl2br", "attr_list"],
+        extensions=["tables", "fenced_code", "codehilite", "toc", "nl2br", "attr_list"],
+        extension_configs={
+            "codehilite": {"css_class": "codehilite", "guess_lang": True, "noclasses": False},
+        },
     )
     html_body = md_ext.convert(full_markdown)
     toc_html = getattr(md_ext, "toc", "")
@@ -457,6 +504,24 @@ def _wrap(body: str, title: str, t: Theme, toc_html: str = "") -> str:
   }}, {{ rootMargin: '-80px 0px -70% 0px' }});
   document.querySelectorAll('h1[id], h2[id], h3[id]').forEach(h => observer.observe(h));
 }})()
+
+// Copy buttons on code blocks
+document.querySelectorAll('pre').forEach(pre => {{
+  const btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.textContent = 'Copy';
+  btn.addEventListener('click', () => {{
+    const code = pre.querySelector('code');
+    const text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(() => {{
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {{ btn.textContent = 'Copy'; btn.classList.remove('copied'); }}, 2000);
+    }});
+  }});
+  pre.style.position = 'relative';
+  pre.appendChild(btn);
+}});
 </script>
 </body>
 </html>"""

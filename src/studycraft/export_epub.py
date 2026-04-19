@@ -62,7 +62,10 @@ def export_epub(
         first_line = ch_md.splitlines()[0].lstrip("# ").strip()
         file_name = f"ch{i:02d}.xhtml"
 
-        html_body = md_lib.markdown(ch_md, extensions=["tables", "fenced_code"])
+        html_body = md_lib.markdown(
+            ch_md, extensions=["tables", "fenced_code", "codehilite"],
+            extension_configs={"codehilite": {"css_class": "codehilite", "guess_lang": True, "noclasses": False}},
+        )
         ch_item = epub.EpubHtml(title=first_line, file_name=file_name, lang="en")
         ch_item.content = f"<html><body>{html_body}</body></html>".encode()
         ch_item.add_item(css)

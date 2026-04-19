@@ -21,13 +21,18 @@ def tmp_md(tmp_path: Path) -> Path:
     return p
 
 
-def test_supported_extensions():
+def test_supported_extensions_complete():
     exts = supported_extensions()
-    assert ".pdf" in exts
-    assert ".docx" in exts
-    assert ".txt" in exts
-    assert ".md" in exts
-    assert ".rtf" in exts
+    for ext in (".pdf", ".docx", ".txt", ".md", ".rtf", ".epub"):
+        assert ext in exts, f"Missing supported extension: {ext}"
+
+
+def test_supported_set_matches_function():
+    assert set(supported_extensions()) == SUPPORTED
+
+
+def test_supported_count():
+    assert len(SUPPORTED) == 6
 
 
 def test_load_txt(tmp_txt: Path):
@@ -49,5 +54,8 @@ def test_unsupported_format(tmp_path: Path):
         load_document(p)
 
 
-def test_supported_set_matches_function():
-    assert set(supported_extensions()) == SUPPORTED
+def test_unsupported_error_message(tmp_path: Path):
+    p = tmp_path / "file.xyz"
+    p.write_text("data")
+    with pytest.raises(ValueError, match=r"\.xyz"):
+        load_document(p)

@@ -669,14 +669,18 @@ def create_app() -> "FastAPI":  # type: ignore
 
     @app.get("/api/models")
     async def list_models(refresh: bool = False):
-        from .model_registry import fetch_models
+        from .model_registry import fetch_models, get_verified_free_models, _HEALTH_FILE
 
         models = fetch_models(force=refresh)
 
+        # On refresh, also run 1-token health probes
+        if refresh:
+            api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
+            if api_key:
+                get_verified_free_models(api_key, force=True)
+
         # Load health cache to filter out known-bad models
         healthy_ids = None
-        from .model_registry import _HEALTH_FILE
-
         if _HEALTH_FILE.exists():
             try:
                 import json as _json
@@ -689,7 +693,6 @@ def create_app() -> "FastAPI":  # type: ignore
         free = [m for m in models if m["is_free"]]
         paid = [m for m in models if not m["is_free"]]
 
-        # If we have health data, put healthy models first
         if healthy_ids:
             healthy_free = [m for m in free if m["id"] in healthy_ids]
             other_free = [m for m in free if m["id"] not in healthy_ids]

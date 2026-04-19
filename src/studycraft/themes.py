@@ -59,6 +59,16 @@ class Theme:
     toc_border: str
     toc_hover_bg: str
 
+    # Syntax highlighting
+    syn_keyword: str
+    syn_string: str
+    syn_comment: str
+    syn_function: str
+    syn_class: str
+    syn_number: str
+    syn_operator: str
+    syn_builtin: str
+
 
 # ── Theme definitions ─────────────────────────────────────────────────────────
 
@@ -93,6 +103,14 @@ DARK = Theme(
     toc_bg="#1a1d2e",
     toc_border="#2a2f45",
     toc_hover_bg="rgba(109,159,255,.1)",
+    syn_keyword="#ff79c6",
+    syn_string="#a3be8c",
+    syn_comment="#6272a4",
+    syn_function="#61afef",
+    syn_class="#e5c07b",
+    syn_number="#bd93f9",
+    syn_operator="#ff79c6",
+    syn_builtin="#8be9fd",
 )
 
 LIGHT = Theme(
@@ -126,6 +144,14 @@ LIGHT = Theme(
     toc_bg="#ffffff",
     toc_border="#e5e7eb",
     toc_hover_bg="#eff6ff",
+    syn_keyword="#d73a49",
+    syn_string="#032f62",
+    syn_comment="#6a737d",
+    syn_function="#6f42c1",
+    syn_class="#e36209",
+    syn_number="#005cc5",
+    syn_operator="#d73a49",
+    syn_builtin="#005cc5",
 )
 
 NORD = Theme(
@@ -159,6 +185,14 @@ NORD = Theme(
     toc_bg="#3b4252",
     toc_border="#4c566a",
     toc_hover_bg="rgba(136,192,208,.1)",
+    syn_keyword="#81a1c1",
+    syn_string="#a3be8c",
+    syn_comment="#616e88",
+    syn_function="#88c0d0",
+    syn_class="#ebcb8b",
+    syn_number="#b48ead",
+    syn_operator="#81a1c1",
+    syn_builtin="#8fbcbb",
 )
 
 SOLARIZED = Theme(
@@ -192,6 +226,14 @@ SOLARIZED = Theme(
     toc_bg="#073642",
     toc_border="#586e75",
     toc_hover_bg="rgba(38,139,210,.1)",
+    syn_keyword="#859900",
+    syn_string="#2aa198",
+    syn_comment="#586e75",
+    syn_function="#268bd2",
+    syn_class="#b58900",
+    syn_number="#d33682",
+    syn_operator="#859900",
+    syn_builtin="#cb4b16",
 )
 
 DRACULA = Theme(
@@ -225,6 +267,14 @@ DRACULA = Theme(
     toc_bg="#44475a",
     toc_border="#6272a4",
     toc_hover_bg="rgba(189,147,249,.1)",
+    syn_keyword="#ff79c6",
+    syn_string="#f1fa8c",
+    syn_comment="#6272a4",
+    syn_function="#50fa7b",
+    syn_class="#8be9fd",
+    syn_number="#bd93f9",
+    syn_operator="#ff79c6",
+    syn_builtin="#8be9fd",
 )
 
 GITHUB = Theme(
@@ -258,6 +308,14 @@ GITHUB = Theme(
     toc_bg="#ffffff",
     toc_border="#d1d9e0",
     toc_hover_bg="#ddf4ff",
+    syn_keyword="#cf222e",
+    syn_string="#0a3069",
+    syn_comment="#6e7781",
+    syn_function="#8250df",
+    syn_class="#953800",
+    syn_number="#0550ae",
+    syn_operator="#cf222e",
+    syn_builtin="#0550ae",
 )
 
 MONOKAI = Theme(
@@ -291,6 +349,14 @@ MONOKAI = Theme(
     toc_bg="#3e3d32",
     toc_border="#49483e",
     toc_hover_bg="rgba(166,226,46,.1)",
+    syn_keyword="#f92672",
+    syn_string="#e6db74",
+    syn_comment="#75715e",
+    syn_function="#a6e22e",
+    syn_class="#66d9ef",
+    syn_number="#ae81ff",
+    syn_operator="#f92672",
+    syn_builtin="#66d9ef",
 )
 
 OCEAN = Theme(
@@ -324,6 +390,14 @@ OCEAN = Theme(
     toc_bg="#1e3148",
     toc_border="#2a475e",
     toc_hover_bg="rgba(102,192,244,.1)",
+    syn_keyword="#66c0f4",
+    syn_string="#a3be8c",
+    syn_comment="#546e7a",
+    syn_function="#4fc3f7",
+    syn_class="#81d4fa",
+    syn_number="#f48fb1",
+    syn_operator="#66c0f4",
+    syn_builtin="#80cbc4",
 )
 
 ROSE_PINE = Theme(
@@ -357,6 +431,14 @@ ROSE_PINE = Theme(
     toc_bg="#1f1d2e",
     toc_border="#26233a",
     toc_hover_bg="rgba(196,167,231,.1)",
+    syn_keyword="#c4a7e7",
+    syn_string="#f6c177",
+    syn_comment="#6e6a86",
+    syn_function="#9ccfd8",
+    syn_class="#ebbcba",
+    syn_number="#ea9a97",
+    syn_operator="#c4a7e7",
+    syn_builtin="#9ccfd8",
 )
 
 # ── Registry ──────────────────────────────────────────────────────────────────
