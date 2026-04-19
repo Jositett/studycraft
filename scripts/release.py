@@ -16,6 +16,32 @@ GREEN = "\033[92m"
 RESET = "\033[0m"
 
 PYPROJECT = Path("pyproject.toml")
+INIT_PY = Path("src/studycraft/__init__.py")
+WEB_PY = Path("src/studycraft/web.py")
+
+
+def _bump_version(version: str) -> None:
+    """Bump version in all files that contain it."""
+    # pyproject.toml
+    text = PYPROJECT.read_text(encoding="utf-8")
+    PYPROJECT.write_text(
+        re.sub(r'version = "[^"]+"', f'version = "{version}"', text),
+        encoding="utf-8",
+    )
+
+    # __init__.py
+    text = INIT_PY.read_text(encoding="utf-8")
+    INIT_PY.write_text(
+        re.sub(r'__version__ = "[^"]+"', f'__version__ = "{version}"', text),
+        encoding="utf-8",
+    )
+
+    # web.py (FastAPI version)
+    text = WEB_PY.read_text(encoding="utf-8")
+    WEB_PY.write_text(
+        re.sub(r'version="[^"]+"', f'version="{version}"', text),
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
@@ -36,11 +62,9 @@ def main() -> None:
         print(f"{RED}CI failed, aborting release.{RESET}")
         sys.exit(1)
 
-    # 2. Bump version in pyproject.toml
-    text = PYPROJECT.read_text(encoding="utf-8")
-    new_text = re.sub(r'version = "[^"]+"', f'version = "{version}"', text)
-    PYPROJECT.write_text(new_text, encoding="utf-8")
-    print(f"{GREEN}Version bumped to {version}{RESET}")
+    # 2. Bump version in all files
+    _bump_version(version)
+    print(f"{GREEN}Version bumped to {version} (pyproject.toml, __init__.py, web.py){RESET}")
 
     # 3. Commit and tag
     subprocess.run(["git", "add", "-A"], check=True)

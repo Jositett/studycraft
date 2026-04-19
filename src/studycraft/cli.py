@@ -144,6 +144,12 @@ def generate(
         "-t",
         help="Export theme (dark, light, nord, solarized, dracula, github, monokai, ocean, rose-pine)",
     ),
+    difficulty: str = typer.Option(
+        "intermediate",
+        "--difficulty",
+        "-d",
+        help="Difficulty level (beginner, intermediate, advanced)",
+    ),
 ) -> None:
     """[bold]Generate[/bold] a full practice guide from any document."""
     doc_path = Path(document)
@@ -189,6 +195,7 @@ def generate(
             context_files=context,
             workers=workers,
             theme=theme,
+            difficulty=difficulty,
         )
     except ValueError as exc:
         console.print(f"[red]✗ Error:[/red] {exc}")
@@ -269,6 +276,12 @@ def export(
         "--theme",
         "-t",
         help="Export theme (dark, light, nord, solarized, dracula, github, monokai, ocean, rose-pine)",
+    ),
+    difficulty: str = typer.Option(
+        "intermediate",
+        "--difficulty",
+        "-d",
+        help="Difficulty level (beginner, intermediate, advanced)",
     ),
 ) -> None:
     """[bold]Re-export[/bold] an existing Markdown guide to HTML, PDF, DOCX, EPUB."""

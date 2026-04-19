@@ -27,7 +27,12 @@ from .loader import load_document
 from .detector import detect_chapters, chapters_to_outline, Chapter
 from .rag import RAGIndex
 from .researcher import research
-from .template import CHAPTER_TEMPLATE, detect_subject_type, example_format_hint
+from .template import (
+    CHAPTER_TEMPLATE,
+    detect_subject_type,
+    example_format_hint,
+    difficulty_hint,
+)
 from .validator import validate_chapter
 
 console = Console()
@@ -84,6 +89,7 @@ class StudyCraft:
         workers: int = 1,
         theme: str | None = None,
         on_check_control: ControlCallback = None,
+        difficulty: str = "intermediate",
     ) -> dict[str, Path]:
         """
         Full pipeline: load -> detect -> index -> generate -> export.
@@ -150,9 +156,29 @@ class StudyCraft:
             on_progress,
             workers,
             on_check_control,
+            difficulty,
         )
 
-        # 6. Answer key (optional)
+        # 6. Review pass — fix chapters with unfilled placeholders
+        console.print("[cyan]Reviewing chapters...[/cyan]")
+        for idx, content in enumerate(generated):
+            if not content or "<!-- Generation failed" in content:
+                continue
+            result = validate_chapter(content, label=f"Ch {idx + 1}")
+            if not result.passed and result.unfilled_placeholders > 0:
+                if on_progress:
+                    on_progress(
+                        len(targets),
+                        len(targets),
+                        f"Fixing chapter {idx + 1} placeholders...",
+                    )
+                fixed = self._fix_placeholders(content, doc_subject)
+                if fixed:
+                    generated[idx] = fixed
+                    console.print(f"  [green]Ch {idx + 1}: fixed placeholders[/green]")
+
+        # 7. Answer key (optional)
+        # 7. Answer key (optional)
         if with_answers:
             if on_progress:
                 on_progress(len(targets), len(targets), "Generating answer key...")
@@ -163,7 +189,7 @@ class StudyCraft:
             ak_path.write_text(answer_key, encoding="utf-8")
             console.print(f"[green]Answer Key[/green] -> {ak_path}")
 
-        # 7. Export
+        # 8. Export
         combined = "\n\n---\n\n".join(generated)
         safe_name = re.sub(r"[^\w\s-]", "", doc_subject).strip().replace(" ", "_")
         from .export import export_all
@@ -186,6 +212,7 @@ class StudyCraft:
         on_progress: ProgressCallback,
         workers: int,
         on_check_control: ControlCallback = None,
+        difficulty: str = "intermediate",
     ) -> list[str]:
         """Generate all target chapters, sequentially or in parallel."""
 
@@ -194,7 +221,9 @@ class StudyCraft:
             cache_file = cache_dir / f"ch{ch_num.replace('.', '_')}.md"
             if int(ch_num.split(".")[0]) < resume_from and cache_file.exists():
                 return idx, cache_file.read_text(encoding="utf-8")
-            content = self._generate_chapter_with_retry(ch, subject)
+            content = self._generate_chapter_with_retry(
+                ch, subject, difficulty=difficulty
+            )
             cache_file.write_text(content, encoding="utf-8")
             return idx, content
 
@@ -257,10 +286,14 @@ class StudyCraft:
     # -- Chapter generation ----------------------------------------------------
 
     def _generate_chapter_with_retry(
-        self, chapter: Chapter, subject: str, max_retries: int = 1
+        self,
+        chapter: Chapter,
+        subject: str,
+        max_retries: int = 1,
+        difficulty: str = "intermediate",
     ) -> str:
         """Generate a chapter, auto-retry once on validation failure."""
-        content = self._generate_chapter(chapter, subject)
+        content = self._generate_chapter(chapter, subject, difficulty=difficulty)
         result = validate_chapter(content, label=f"Ch {chapter['num']}")
 
         if result.passed or max_retries < 1:
@@ -274,7 +307,9 @@ class StudyCraft:
             f"  [yellow]Ch {chapter['num']} failed validation ({result.summary()}) -- retrying...[/yellow]"
         )
         time.sleep(self.rate_limit_seconds)
-        content = self._generate_chapter(chapter, subject, temperature=0.5)
+        content = self._generate_chapter(
+            chapter, subject, temperature=0.5, difficulty=difficulty
+        )
         retry_result = validate_chapter(content, label=f"Ch {chapter['num']}")
         if not retry_result.passed:
             console.print(
@@ -283,7 +318,11 @@ class StudyCraft:
         return content
 
     def _generate_chapter(
-        self, chapter: Chapter, subject: str, temperature: float = 0.3
+        self,
+        chapter: Chapter,
+        subject: str,
+        temperature: float = 0.3,
+        difficulty: str = "intermediate",
     ) -> str:
         sub_titles = [s["title"] for s in chapter["subchapters"]]
         sub_label = (
@@ -303,6 +342,7 @@ class StudyCraft:
         # Subject-type detection for format hints
         subject_type = detect_subject_type(subject)
         format_hint = example_format_hint(subject_type)
+        diff_hint = difficulty_hint(difficulty)
 
         # Fill template
         filled_template = (
@@ -338,6 +378,10 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
 <format_instructions>
 {format_hint}
 </format_instructions>
+
+<difficulty>
+{diff_hint}
+</difficulty>
 
 <template>
 {filled_template}
@@ -438,6 +482,23 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
         return False
 
     # -- Answer key generation -------------------------------------------------
+
+    def _fix_placeholders(self, content: str, subject: str) -> str | None:
+        """Targeted fix: replace unfilled [...] placeholders in a chapter."""
+        prompt = (
+            f"The following practice guide chapter for '{subject}' has unfilled "
+            "placeholders marked with [...] brackets. Replace EVERY [...] placeholder "
+            "with real, accurate, subject-specific content. Do NOT change any other text. "
+            "Output the COMPLETE fixed chapter.\n\n"
+            f"{content}"
+        )
+        try:
+            fixed = self._llm_call_with_backoff(prompt=prompt, temperature=0.4)
+            if fixed and "[...]" not in fixed and len(fixed) > len(content) * 0.5:
+                return fixed
+        except Exception:
+            pass
+        return None
 
     def _generate_answer_key(self, chapter_contents: list[str], subject: str) -> str:
         """Generate an answer key from all chapter quiz questions and exercises."""

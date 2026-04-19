@@ -154,6 +154,16 @@ def _hex_to_rgb(h: str) -> tuple[int, int, int]:
     return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
 
 
+def _strip_emojis(text: str) -> str:
+    """Remove emoji characters that break PDF fonts."""
+    return re.sub(
+        r"[\U0001f300-\U0001f9ff\U00002702-\U000027b0\U0000fe00-\U0000fe0f"
+        r"\U0000200d\U00002600-\U000026ff\U00002700-\U000027bf]+",
+        "",
+        text,
+    ).strip()
+
+
 # ── Main export ───────────────────────────────────────────────────────────────
 
 
@@ -273,7 +283,7 @@ def _export_pdf(full_markdown: str, pdf_path: Path, base_name: str, t: Theme) ->
     pdf.ln(40)
     pdf.set_font("Helvetica", "B", 28)
     pdf.set_text_color(h1r, h1g, h1b)
-    pdf.multi_cell(0, 14, base_name.replace("_", " "), align="C")
+    pdf.multi_cell(0, 14, _strip_emojis(base_name.replace("_", " ")), align="C")
     pdf.ln(6)
     pdf.set_font("Helvetica", "", 12)
     pdf.set_text_color(mur, mug, mub)
@@ -311,7 +321,7 @@ def _export_pdf(full_markdown: str, pdf_path: Path, base_name: str, t: Theme) ->
             pdf.set_font("Helvetica", "B", 18)
             pdf.set_text_color(h1r, h1g, h1b)
             pdf.ln(6)
-            pdf.multi_cell(0, 9, stripped[2:])
+            pdf.multi_cell(0, 9, _strip_emojis(stripped[2:]))
             pdf.set_draw_color(h1r, h1g, h1b)
             pdf.line(pdf.get_x() + 10, pdf.get_y(), pdf.w - 10, pdf.get_y())
             pdf.ln(4)
@@ -319,13 +329,13 @@ def _export_pdf(full_markdown: str, pdf_path: Path, base_name: str, t: Theme) ->
             pdf.set_font("Helvetica", "B", 14)
             pdf.set_text_color(h2r, h2g, h2b)
             pdf.ln(4)
-            pdf.multi_cell(0, 8, stripped[3:])
+            pdf.multi_cell(0, 8, _strip_emojis(stripped[3:]))
             pdf.ln(2)
         elif stripped.startswith("### "):
             pdf.set_font("Helvetica", "B", 12)
             pdf.set_text_color(h3r, h3g, h3b)
             pdf.ln(3)
-            pdf.multi_cell(0, 7, stripped[4:])
+            pdf.multi_cell(0, 7, _strip_emojis(stripped[4:]))
             pdf.ln(2)
         elif stripped.startswith("```"):
             pdf.set_font("Courier", "", 9)
@@ -340,23 +350,23 @@ def _export_pdf(full_markdown: str, pdf_path: Path, base_name: str, t: Theme) ->
             pdf.set_font("Helvetica", "", 10)
             pdf.set_text_color(txr, txg, txb)
             pdf.cell(8)
-            pdf.multi_cell(0, 6, f"\u2022 {stripped[2:]}")
+            pdf.multi_cell(0, 6, _strip_emojis(f"\u2022 {stripped[2:]}"))
             pdf.ln(1)
         elif _re.match(r"^\d+\.", stripped):
             pdf.set_font("Helvetica", "", 10)
             pdf.set_text_color(txr, txg, txb)
             pdf.cell(4)
-            pdf.multi_cell(0, 6, stripped)
+            pdf.multi_cell(0, 6, _strip_emojis(stripped))
             pdf.ln(1)
         elif stripped:
             if pdf.font_family == "Courier":
                 pdf.cell(4)
-                pdf.multi_cell(0, 5, stripped, fill=True)
+                pdf.multi_cell(0, 5, _strip_emojis(stripped), fill=True)
             else:
                 pdf.set_font("Helvetica", "", 10)
                 pdf.set_text_color(txr, txg, txb)
                 clean = _re.sub(r"\*\*(.+?)\*\*", r"\1", stripped)
-                pdf.multi_cell(0, 6, clean)
+                pdf.multi_cell(0, 6, _strip_emojis(clean))
                 pdf.ln(1)
         else:
             if pdf.font_family == "Courier":

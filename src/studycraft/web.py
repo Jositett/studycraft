@@ -275,6 +275,13 @@ _HTML = """<!DOCTYPE html>
       <option value="rose-pine">Ros\u00e9 Pine</option>
     </select>
 
+    <label for="difficulty-select">Difficulty</label>
+    <select id="difficulty-select">
+      <option value="beginner">Beginner</option>
+      <option value="intermediate" selected>Intermediate</option>
+      <option value="advanced">Advanced</option>
+    </select>
+
     <button type="submit" id="generate-btn" onclick="startGeneration()">Generate Guide</button>
     <div class="error" id="error-msg" style="display:none"></div>
   </div>
@@ -330,6 +337,15 @@ _HTML = """<!DOCTYPE html>
   <hr>
   <h4>🎨 Theme</h4>
   <p>Choose a color theme for all exported files (HTML, PDF, DOCX, EPUB). Dark is the default.</p>
+
+  <hr>
+  <h4>🎯 Difficulty</h4>
+  <p>Controls the complexity of examples, exercises, and quiz questions:</p>
+  <ul>
+    <li><code>Beginner</code> \u2014 simple vocabulary, basic recall</li>
+    <li><code>Intermediate</code> \u2014 multi-step reasoning, real-world scenarios</li>
+    <li><code>Advanced</code> \u2014 production-grade, design & evaluation</li>
+  </ul>
 
   <hr>
   <h4>📥 Output Formats</h4>
@@ -464,6 +480,7 @@ _HTML = """<!DOCTYPE html>
     form.append('subject', document.getElementById('subject-input').value);
     form.append('model', document.getElementById('model-select').value);
     form.append('theme', document.getElementById('theme-select').value);
+    form.append('difficulty', document.getElementById('difficulty-select').value);
     form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
     for (let i = 0; i < contextFiles.length; i++) form.append('context_files', contextFiles[i]);
 
@@ -587,7 +604,7 @@ def create_app() -> "FastAPI":  # type: ignore
 
     from .jobstore import JobStore
 
-    app = FastAPI(title="StudyCraft", version="0.8.0")
+    app = FastAPI(title="StudyCraft", version="0.9.0")
     store = JobStore(db_path=OUTPUT_DIR / "jobs.db")
 
     @app.get("/favicon.svg")
@@ -607,6 +624,7 @@ def create_app() -> "FastAPI":  # type: ignore
         model: str = Form("meta-llama/llama-3.1-8b-instruct:free"),
         with_answers: str = Form(""),
         theme: str = Form("dark"),
+        difficulty: str = Form("intermediate"),
         context_files: list[UploadFile] = File(default=[]),
     ):
         api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
@@ -643,6 +661,7 @@ def create_app() -> "FastAPI":  # type: ignore
             ctx_paths,
             store,
             theme,
+            difficulty,
         )
         return JSONResponse({"job_id": job_id})
 
@@ -747,6 +766,7 @@ async def _run_job(
     context_files: list[str] | None = None,
     store: "object | None" = None,
     theme: str = "dark",
+    difficulty: str = "intermediate",
 ):
     """Background job that runs StudyCraft and updates the job store."""
     try:
@@ -789,6 +809,7 @@ async def _run_job(
             context_files=context_files,
             theme=theme,
             on_check_control=_check_control,
+            difficulty=difficulty,
         )
 
         # Check if stopped during generation

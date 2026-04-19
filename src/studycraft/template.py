@@ -51,6 +51,39 @@ def example_format_hint(subject_type: str) -> str:
     }.get(subject_type, "Use the most appropriate format for the subject.")
 
 
+DIFFICULTY_HINTS = {
+    "beginner": (
+        "Target audience: complete beginners with no prior knowledge.\n"
+        "- Use simple vocabulary and short sentences\n"
+        "- Explain every term before using it\n"
+        "- Examples should be trivial and self-contained\n"
+        "- Quiz questions should test basic recall and recognition\n"
+        "- Avoid jargon; use analogies to everyday life"
+    ),
+    "intermediate": (
+        "Target audience: learners with foundational knowledge.\n"
+        "- Assume basic terminology is known\n"
+        "- Examples should combine multiple concepts\n"
+        "- Include some edge cases and gotchas\n"
+        "- Quiz questions should test application and analysis\n"
+        "- Reference real-world use cases"
+    ),
+    "advanced": (
+        "Target audience: experienced practitioners deepening expertise.\n"
+        "- Use precise technical language\n"
+        "- Examples should involve complex, production-grade scenarios\n"
+        "- Include performance considerations and trade-offs\n"
+        "- Quiz questions should test synthesis, evaluation, and design\n"
+        "- Reference cutting-edge practices and research"
+    ),
+}
+
+
+def difficulty_hint(level: str) -> str:
+    """Return prompt instructions for the given difficulty level."""
+    return DIFFICULTY_HINTS.get(level, DIFFICULTY_HINTS["intermediate"])
+
+
 CHAPTER_TEMPLATE = """\
 # 📖 Practice Guide — {subject}
 ## Chapter {chapter_num}: {chapter_title}
