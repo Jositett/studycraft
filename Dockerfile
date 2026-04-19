@@ -28,6 +28,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=utf-8
 
 VOLUME ["/app/output", "/app/uploads", "/app/rag_index"]
-EXPOSE 8000
+ENV PORT=8000
+EXPOSE ${PORT}
 
-CMD ["studycraft-web"]
+CMD studycraft-web --port ${PORT}

@@ -841,8 +841,14 @@ def main():
         )
         sys.exit(1)
 
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "8000")))
+    args = parser.parse_args()
+
     app = create_app()
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=args.port, reload=False)
 
 
 if __name__ == "__main__":
