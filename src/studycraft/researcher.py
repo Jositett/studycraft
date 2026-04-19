@@ -56,7 +56,11 @@ def _build_queries(
 def _search(query: str, max_results: int) -> str:
     console.print(f"  [dim]🔍 {query!r}[/dim]")
     try:
-        from duckduckgo_search import DDGS
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from duckduckgo_search import DDGS
 
         hits = DDGS().text(query, max_results=max_results)
         if not hits:

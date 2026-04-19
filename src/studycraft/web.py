@@ -104,7 +104,29 @@ _HTML = """<!DOCTYPE html>
     width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;
   }
 
-  .context-hint { color: var(--muted); font-size: .75rem; margin: -.5rem 0 1rem; opacity: .7; }
+  .ctx-drop-zone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 1.25rem 1rem; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; margin-bottom: .5rem;
+  }
+  .ctx-drop-zone:hover, .ctx-drop-zone.active { border-color: var(--primary); background: rgba(109,159,255,.06); }
+  .ctx-drop-zone.has-files { border-color: var(--success); border-style: solid; background: rgba(74,222,128,.05); }
+  .ctx-drop-zone p { color: var(--muted); font-size: .8rem; margin-top: .35rem; }
+  .ctx-drop-zone p strong { color: var(--primary); }
+  .ctx-drop-zone input { display: none; }
+  .ctx-file-list { margin: .5rem 0 1rem; font-size: .8rem; }
+  .ctx-file-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .3rem .5rem; background: var(--bg); border-radius: 6px; margin-bottom: .25rem;
+  }
+  .ctx-file-item span { color: var(--success); font-weight: 500; }
+  .ctx-file-item button {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: .9rem; padding: 0 .25rem; transition: color .15s;
+  }
+  .ctx-file-item button:hover { color: var(--error-text); }
+
+  .context-hint { color: var(--muted); font-size: .75rem; margin: 0 0 1rem; opacity: .7; }
 
   button[type=submit] {
     width: 100%; padding: .85rem; font-size: 1rem; font-weight: 700;
@@ -218,9 +240,16 @@ _HTML = """<!DOCTYPE html>
       Generate answer key
     </label>
 
-    <label for="context-input">Additional context files (optional)</label>
-    <input type="file" id="context-input" multiple accept=".pdf,.docx,.txt,.md,.rtf,.epub"
-      style="margin-bottom:.75rem;font-size:.85rem;color:var(--muted)">
+    <label>Additional context files (optional)</label>
+    <div class="ctx-drop-zone" id="ctx-drop-zone">
+      <svg width="24" height="24" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24">
+        <path d="M12 5v14m-7-7h14" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <p>Drag & drop context files, or <strong>click to browse</strong></p>
+      <p style="font-size:.7rem;opacity:.5">Multiple files supported · PDF · DOCX · TXT · MD · RTF · EPUB</p>
+      <input type="file" id="context-input" multiple accept=".pdf,.docx,.txt,.md,.rtf,.epub">
+    </div>
+    <div class="ctx-file-list" id="ctx-file-list"></div>
     <p class="context-hint">Extra files indexed into RAG for richer context (not generated as chapters)</p>
 
     <label for="model-select">Model</label>
@@ -254,6 +283,10 @@ _HTML = """<!DOCTYPE html>
     <h2>⚙️ Generating your guide…</h2>
     <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
     <div class="status-text running" id="status-text">Starting up…</div>
+    <div style="display:flex;gap:.5rem;margin-top:1rem">
+      <button type="button" class="new-btn" id="pause-btn" onclick="controlJob('pause')">⏸ Pause</button>
+      <button type="button" class="new-btn" id="stop-btn" onclick="controlJob('stop')" style="border-color:var(--error-border);color:var(--error-text)">⏹ Stop</button>
+    </div>
   </div>
 
   <div class="card results" id="results-card">
@@ -352,10 +385,49 @@ _HTML = """<!DOCTYPE html>
   }
   loadModels();
 
+  // Context files drop zone
+  const ctxZone = document.getElementById('ctx-drop-zone');
+  const ctxInput = document.getElementById('context-input');
+  const ctxList = document.getElementById('ctx-file-list');
+  let contextFiles = [];
+
+  ctxZone.addEventListener('click', () => ctxInput.click());
+  ctxZone.addEventListener('dragover', e => { e.preventDefault(); ctxZone.classList.add('active'); });
+  ctxZone.addEventListener('dragleave', () => ctxZone.classList.remove('active'));
+  ctxZone.addEventListener('drop', e => {
+    e.preventDefault(); ctxZone.classList.remove('active');
+    addContextFiles(e.dataTransfer.files);
+  });
+  ctxInput.addEventListener('change', () => {
+    addContextFiles(ctxInput.files);
+    ctxInput.value = '';
+  });
+
+  function addContextFiles(files) {
+    for (const f of files) {
+      if (!contextFiles.some(c => c.name === f.name && c.size === f.size)) {
+        contextFiles.push(f);
+      }
+    }
+    renderContextFiles();
+  }
+  function removeContextFile(idx) {
+    contextFiles.splice(idx, 1);
+    renderContextFiles();
+  }
+  function renderContextFiles() {
+    ctxZone.classList.toggle('has-files', contextFiles.length > 0);
+    ctxList.innerHTML = contextFiles.map((f, i) =>
+      `<div class="ctx-file-item"><span>📎 ${f.name}</span><button onclick="removeContextFile(${i})" title="Remove">✕</button></div>`
+    ).join('');
+  }
+  window.removeContextFile = removeContextFile;
+
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('file-input');
   const fileName  = document.getElementById('file-name');
   let selectedFile = null;
+  let currentJobId = null;
 
   dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('active'); });
@@ -393,8 +465,7 @@ _HTML = """<!DOCTYPE html>
     form.append('model', document.getElementById('model-select').value);
     form.append('theme', document.getElementById('theme-select').value);
     form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
-    const ctxFiles = document.getElementById('context-input').files;
-    for (let i = 0; i < ctxFiles.length; i++) form.append('context_files', ctxFiles[i]);
+    for (let i = 0; i < contextFiles.length; i++) form.append('context_files', contextFiles[i]);
 
     let jobId;
     try {
@@ -402,6 +473,7 @@ _HTML = """<!DOCTYPE html>
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Upload failed');
       jobId = data.job_id;
+      currentJobId = jobId;
     } catch(e) {
       errEl.textContent = e.message;
       errEl.style.display = 'block';
@@ -436,6 +508,15 @@ _HTML = """<!DOCTYPE html>
       if (d.status === 'done') {
         clearInterval(poll);
         showResults(jobId, d.files);
+      } else if (d.status === 'stopped') {
+        clearInterval(poll);
+        document.getElementById('status-text').textContent = 'Generation stopped';
+        document.getElementById('status-text').classList.remove('running');
+        document.getElementById('pause-btn').style.display = 'none';
+        document.getElementById('stop-btn').style.display = 'none';
+        btn.disabled = false;
+        document.getElementById('upload-card').style.opacity = '1';
+        if (d.files && Object.keys(d.files).length) showResults(jobId, d.files);
       } else if (d.status === 'error') {
         clearInterval(poll);
         errEl.textContent = d.message;
@@ -449,6 +530,7 @@ _HTML = """<!DOCTYPE html>
   function showResults(jobId, files) {
     document.getElementById('progress-card').style.display = 'none';
     document.getElementById('results-card').style.display = 'block';
+    currentJobId = null;
     const links = document.getElementById('download-links');
     links.innerHTML = '';
     for (const [fmt, path] of Object.entries(files)) {
@@ -457,11 +539,30 @@ _HTML = """<!DOCTYPE html>
     }
   }
 
+  async function controlJob(action) {
+    if (!currentJobId) return;
+    const form = new FormData();
+    form.append('action', action);
+    await fetch(`/api/control/${currentJobId}`, { method: 'POST', body: form });
+    const pauseBtn = document.getElementById('pause-btn');
+    if (action === 'pause') {
+      pauseBtn.textContent = '\u25b6 Resume';
+      pauseBtn.onclick = () => controlJob('resume');
+    } else if (action === 'resume') {
+      pauseBtn.textContent = '\u23f8 Pause';
+      pauseBtn.onclick = () => controlJob('pause');
+    } else if (action === 'stop') {
+      document.getElementById('status-text').textContent = 'Stopping...';
+    }
+  }
+
   function resetUI() {
     selectedFile = null;
     fileName.textContent = '';
     fileInput.value = '';
     dropZone.classList.remove('has-file');
+    contextFiles = [];
+    renderContextFiles();
     document.getElementById('subject-input').value = '';
     document.getElementById('answers-check').checked = false;
     document.getElementById('generate-btn').disabled = false;
@@ -585,6 +686,17 @@ def create_app() -> "FastAPI":  # type: ignore
             raise HTTPException(status_code=404, detail="File not found")
         return FileResponse(job["files"][fmt])
 
+    @app.post("/api/control/{job_id}")
+    async def control(job_id: str, action: str = Form(...)):
+        job = store.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if action in ("pause", "stop", "resume"):
+            ctrl = "" if action == "resume" else action
+            store.update(job_id, control=ctrl)
+            return JSONResponse({"ok": True, "action": action})
+        raise HTTPException(status_code=400, detail="Invalid action")
+
     return app
 
 
@@ -611,6 +723,21 @@ async def _run_job(
             pct = int(10 + (current / max(total, 1)) * 85)
             store.update(job_id, progress=pct, message=msg)
 
+        def _check_control() -> str | None:
+            """Check for pause/stop signals. Returns 'stop' or blocks on pause."""
+            ctrl = store.get_control(job_id)
+            if ctrl == "stop":
+                return "stop"
+            while ctrl == "pause":
+                store.update(job_id, message="Paused")
+                import time as _time
+
+                _time.sleep(2)
+                ctrl = store.get_control(job_id)
+                if ctrl == "stop":
+                    return "stop"
+            return None
+
         craft = StudyCraft(
             api_key=api_key,
             model=model,
@@ -624,7 +751,18 @@ async def _run_job(
             with_answers=with_answers,
             context_files=context_files,
             theme=theme,
+            on_check_control=_check_control,
         )
+
+        # Check if stopped during generation
+        if store.get_control(job_id) == "stop":
+            store.update(
+                job_id,
+                status="stopped",
+                message="Stopped by user",
+                files={fmt: str(path) for fmt, path in paths.items()},
+            )
+            return
 
         store.update(
             job_id,

@@ -155,6 +155,7 @@ def generate(
         Panel(
             f"[bold]Document:[/bold] {doc_path.name}\n"
             f"[bold]Model:[/bold]    {model}\n"
+            f"[bold]Theme:[/bold]    {theme or 'dark'}\n"
             f"[bold]Output:[/bold]   {output}/",
             title="🔨 StudyCraft — Generating Guide",
             border_style="cyan",
@@ -263,8 +264,14 @@ def export(
     name: str = typer.Option(
         "StudyCraft_Practice_Guide", "--name", "-n", help="Base filename"
     ),
+    theme: Optional[str] = typer.Option(
+        None,
+        "--theme",
+        "-t",
+        help="Export theme (dark, light, nord, solarized, dracula, github, monokai, ocean, rose-pine)",
+    ),
 ) -> None:
-    """[bold]Re-export[/bold] an existing Markdown guide to HTML and PDF."""
+    """[bold]Re-export[/bold] an existing Markdown guide to HTML, PDF, DOCX, EPUB."""
     md_path = Path(markdown_file)
     if not md_path.exists():
         console.print(f"[red]✗ File not found:[/red] {md_path}")
@@ -273,7 +280,7 @@ def export(
     from .export import export_all
 
     text = md_path.read_text(encoding="utf-8")
-    paths = export_all(text, Path(output), base_name=name)
+    paths = export_all(text, Path(output), base_name=name, theme=theme)
     console.print("[green]✓ Re-export complete.[/green]")
     for fmt, path in paths.items():
         console.print(f"  [cyan]{fmt.upper()}[/cyan] → {path.resolve()}")

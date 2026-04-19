@@ -34,6 +34,7 @@ console = Console()
 
 # Type alias for progress callbacks: (current, total, message) -> None
 ProgressCallback = Callable[[int, int, str], None] | None
+ControlCallback = Callable[[], str | None] | None
 
 DEFAULT_MODEL = "openrouter/free"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
@@ -77,6 +78,7 @@ class StudyCraft:
         context_files: list[str | Path] | None = None,
         workers: int = 1,
         theme: str | None = None,
+        on_check_control: ControlCallback = None,
     ) -> dict[str, Path]:
         """
         Full pipeline: load -> detect -> index -> generate -> export.
@@ -136,7 +138,13 @@ class StudyCraft:
         )
 
         generated = self._generate_all(
-            targets, doc_subject, cache_dir, resume_from, on_progress, workers
+            targets,
+            doc_subject,
+            cache_dir,
+            resume_from,
+            on_progress,
+            workers,
+            on_check_control,
         )
 
         # 6. Answer key (optional)
@@ -172,6 +180,7 @@ class StudyCraft:
         resume_from: int,
         on_progress: ProgressCallback,
         workers: int,
+        on_check_control: ControlCallback = None,
     ) -> list[str]:
         """Generate all target chapters, sequentially or in parallel."""
 
@@ -220,6 +229,20 @@ class StudyCraft:
                     _, content = _gen_one(idx, ch)
                     generated[idx] = content
                     progress.advance(task)
+
+                    if on_progress:
+                        on_progress(
+                            idx + 1,
+                            len(targets),
+                            f"Completed chapter {idx + 1} of {len(targets)}",
+                        )
+
+                    # Check for pause/stop
+                    if on_check_control:
+                        signal = on_check_control()
+                        if signal == "stop":
+                            console.print("[yellow]Generation stopped by user[/yellow]")
+                            break
 
                     if ch is not targets[-1]:
                         time.sleep(self.rate_limit_seconds)
@@ -341,7 +364,8 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
     def _llm_call_with_backoff(
         self, prompt: str, temperature: float = 0.3, max_attempts: int = 4
     ) -> str:
-        """Call the LLM with exponential backoff on 429 rate-limit errors."""
+        """Call the LLM with exponential backoff on retryable errors."""
+        last_exc = None
         for attempt in range(max_attempts):
             try:
                 resp = self.client.chat.completions.create(
@@ -350,16 +374,30 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                     temperature=temperature,
                     max_tokens=4500,
                 )
-                return resp.choices[0].message.content.strip()
+                content = resp.choices[0].message.content
+                if content is None:
+                    raise ValueError("LLM returned empty response")
+                return content.strip()
             except Exception as exc:
-                if "429" in str(exc) and attempt < max_attempts - 1:
+                last_exc = exc
+                err = str(exc)
+                retryable = "429" in err or "500" in err or "502" in err or "503" in err
+                if retryable and attempt < max_attempts - 1:
                     wait = self.rate_limit_seconds * (2**attempt)
                     console.print(
-                        f"  [yellow]Rate limited, waiting {wait}s before retry...[/yellow]"
+                        f"  [yellow]Error {err[:60]}... waiting {wait}s before retry...[/yellow]"
                     )
                     time.sleep(wait)
+                elif "400" in err and attempt < max_attempts - 1:
+                    # Bad request — try with truncated prompt
+                    console.print(
+                        "  [yellow]400 error, truncating prompt and retrying...[/yellow]"
+                    )
+                    prompt = prompt[: len(prompt) * 2 // 3]
+                    time.sleep(self.rate_limit_seconds)
                 else:
                     raise
+        raise last_exc  # type: ignore[misc]
 
     # -- Answer key generation -------------------------------------------------
 
