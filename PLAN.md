@@ -1,20 +1,23 @@
 # 🗺️ StudyCraft — Development Plan
 
-## Status: v0.8.0 — Theme System + TOC Navigation ✅
+## Status: v0.9.0 — Difficulty Levels, Review Step, Model Switching ✅
 
 ### What's working
 - ✅ Universal document loader (PDF, DOCX, TXT, MD, RTF, EPUB)
 - ✅ Auto chapter + subchapter detection (3 strategies with fallback)
 - ✅ RAG index (ChromaDB + MiniLM) — clears between documents
-- ✅ Subject-aware web research (DuckDuckGo, multi-query per chapter)
+- ✅ Subject-aware web research (ddgs, multi-query per chapter)
 - ✅ Universal practice guide template (8 sections, subject-agnostic)
-- ✅ LLM generation via OpenRouter (any model, configurable)
+- ✅ LLM generation via OpenRouter with auto model switching (up to 5 fallbacks)
+- ✅ Difficulty levels: beginner, intermediate, advanced
+- ✅ Post-generation review step (auto-fixes unfilled placeholders)
+- ✅ Model health testing (1-token probe, 6h cache)
 - ✅ Per-chapter cache + `--resume-from` crash recovery
-- ✅ Export pipeline: MD → HTML → PDF → DOCX → EPUB (all with TOC)
-- ✅ 9 built-in themes (dark, light, nord, solarized, dracula, github, monokai, ocean, rosé-pine)
-- ✅ Typer CLI with Rich output, progress bars, and `--theme` flag
-- ✅ Web UI (dark mode, dynamic models, theme selector, time estimates)
-- ✅ 429 rate-limit retry with exponential backoff
+- ✅ Export pipeline: MD → HTML → PDF → DOCX → EPUB (all with TOC + themes)
+- ✅ 9 built-in themes
+- ✅ Pause/stop controls in web UI
+- ✅ Typer CLI with Rich output, progress bars, `--theme`, `--difficulty`
+- ✅ Web UI (dark mode, dynamic models, drag & drop context files)
 - ✅ `uv`-managed project with editable install
 
 ---

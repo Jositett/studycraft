@@ -77,6 +77,7 @@ studycraft generate "doc.pdf" --resume-from 5               # Resume after crash
 studycraft generate "doc.pdf" --with-answers                # Include answer key
 studycraft generate "doc.pdf" --workers 3                   # Parallel generation
 studycraft generate "doc.pdf" --theme dracula                # Choose export theme
+studycraft generate "doc.pdf" --difficulty beginner           # Set difficulty level
 studycraft generate "doc.pdf" --context "extra.pdf"         # Add RAG context files
 
 # Inspection & validation
@@ -172,7 +173,7 @@ uv run python scripts/ci.py            # Run full CI (lint + test + build)
 uv run python scripts/ci.py --lint     # Lint only
 uv run python scripts/ci.py --test     # Test only
 uv run python scripts/ci.py --build    # Build only
-uv run python scripts/release.py 0.8.0 # Release: CI + bump + tag + build
+uv run python scripts/release.py 0.9.0 # Release: CI + bump + tag + build
 ```
 
 See `PLAN.md` for the full development roadmap and `CHANGELOG.md` for version history.

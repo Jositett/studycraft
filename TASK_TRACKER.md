@@ -20,6 +20,19 @@
 
 ## Completed
 
+### v0.9.0 — Difficulty, Review Step, Model Switching ✅
+
+- [x] Difficulty levels (beginner/intermediate/advanced) — CLI + web UI + prompt injection
+- [x] Post-generation review step — auto-fixes unfilled placeholders
+- [x] Auto model switching on persistent failure (up to 5 fallbacks)
+- [x] Model health testing (1-token probe, 6h cache)
+- [x] Pause/stop controls in web UI
+- [x] Context files drag & drop zone
+- [x] Replaced `duckduckgo-search` with `ddgs`
+- [x] PDF emoji fix, progress tracking fix
+- [x] Release script bumps all version files
+- [x] 53 tests passing
+
 ### v0.8.0 — Theme System + TOC Navigation ✅
 
 - [x] `themes.py` with Theme dataclass and 9 themes (dark, light, nord, solarized, dracula, github, monokai, ocean, rosé-pine)

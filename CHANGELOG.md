@@ -2,6 +2,34 @@
 
 All notable changes to StudyCraft will be documented in this file.
 
+## [0.9.0] — 2025-01-21
+
+### Added
+- Difficulty levels: `beginner`, `intermediate`, `advanced` — controls example complexity, quiz depth, and language
+- `--difficulty` / `-d` CLI flag + web UI dropdown
+- Post-generation review step — auto-fixes unfilled `[...]` placeholders with a targeted LLM call
+- Auto model switching on persistent failure (up to 5 switches to verified fallback models)
+- Model health testing: 1-token probe per free model, cached 6h at `~/.studycraft/model_health.json`
+- `get_fallback_chain()`, `get_verified_free_models()`, `test_model()` in model registry
+- `POST /api/models/test` endpoint to trigger health checks from web UI
+- `/api/models` now prioritizes healthy models in dropdown
+- Pause/stop controls in web UI progress card
+- Context files drag & drop zone with file list and remove buttons
+- `POST /api/control/{job_id}` endpoint for pause/stop/resume
+
+### Changed
+- Replaced `duckduckgo-search` with `ddgs` package (no more RuntimeWarning spam)
+- PDF export strips emoji characters to prevent font encoding errors
+- Engine fires progress callback after each chapter completes (not just before)
+- Release script (`scripts/release.py`) now bumps version in all 3 files
+- 53 tests passing
+
+### Fixed
+- PDF crash on emoji characters (`\U0001f4d6` in cover title)
+- `NoneType` crash when LLM returns empty response
+- 400 errors now trigger prompt truncation + retry
+- Progress bar in web UI now updates between chapters
+
 ## [0.8.0] — 2025-01-21
 
 ### Added

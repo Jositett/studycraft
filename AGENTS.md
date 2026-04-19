@@ -20,6 +20,7 @@ uv run studycraft models --free --vision # List free vision models
 -m, --model <id>         # Specify OpenRouter model (default: openrouter/free)
 -x, --context "extra.pdf" # Add supplementary RAG context files
 -w, --workers 3          # Parallel generation
+-d, --difficulty "beginner" # Difficulty (beginner, intermediate, advanced)
 -t, --theme "dracula"     # Export theme (dark, light, nord, solarized, dracula, github, monokai, ocean, rose-pine)
 --with-answers           # Generate answer key
 --clear-cache            # Delete cached chapters
@@ -39,7 +40,7 @@ Set `OPENROUTER_API_KEY` (or `STUDYCRAFT_API_KEY`) in `.env`. Get free key at <h
 uv run python scripts/ci.py              # Full CI: lint + test + build
 uv run python scripts/ci.py --lint       # Lint only
 uv run python scripts/ci.py --test       # Test only
-uv run python scripts/release.py 0.8.0   # CI + bump version + tag + build
+uv run python scripts/release.py 0.9.0   # CI + bump version + tag + build
 ```
 
 ## Architecture
