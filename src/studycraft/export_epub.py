@@ -14,26 +14,24 @@ from rich.console import Console
 
 console = Console()
 
-_EPUB_CSS = """
-body { font-family: Georgia, serif; line-height: 1.6; color: #111; }
-h1 { color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 4px; }
-h2 { color: #1e3a8a; }
-h3 { color: #7c3aed; }
-pre { background: #1e293b; color: #e2e8f0; padding: 12px; border-radius: 6px; }
-code { font-family: monospace; background: #f1f5f9; padding: 2px 4px; border-radius: 3px; }
-pre code { background: none; }
-blockquote { border-left: 3px solid #2563eb; padding-left: 12px; color: #1e40af; font-style: italic; }
-table { border-collapse: collapse; width: 100%; }
-th { background: #2563eb; color: white; padding: 6px 10px; text-align: left; }
-td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; }
-"""
+_EPUB_CSS = ""  # Generated from theme at export time
 
 
 def export_epub(
-    full_markdown: str, output_path: Path, title: str = "StudyCraft Guide"
+    full_markdown: str,
+    output_path: Path,
+    title: str = "StudyCraft Guide",
+    theme: "object | None" = None,
 ) -> Path:
     """Export Markdown text to an EPUB file."""
     from ebooklib import epub  # type: ignore
+
+    if theme:
+        from .export import _build_epub_css
+
+        epub_css = _build_epub_css(theme)
+    else:
+        epub_css = "body { font-family: Georgia, serif; line-height: 1.6; }"
 
     book = epub.EpubBook()
     book.set_identifier("studycraft-guide")
@@ -46,7 +44,7 @@ def export_epub(
         uid="style",
         file_name="style/default.css",
         media_type="text/css",
-        content=_EPUB_CSS.encode(),
+        content=epub_css.encode(),
     )
     book.add_item(css)
 

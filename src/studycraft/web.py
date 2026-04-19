@@ -233,6 +233,19 @@ _HTML = """<!DOCTYPE html>
       </button>
     </div>
 
+    <label for="theme-select">Theme</label>
+    <select id="theme-select">
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+      <option value="nord">Nord</option>
+      <option value="solarized">Solarized</option>
+      <option value="dracula">Dracula</option>
+      <option value="github">GitHub</option>
+      <option value="monokai">Monokai</option>
+      <option value="ocean">Ocean</option>
+      <option value="rose-pine">Ros\u00e9 Pine</option>
+    </select>
+
     <button type="submit" id="generate-btn" onclick="startGeneration()">Generate Guide</button>
     <div class="error" id="error-msg" style="display:none"></div>
   </div>
@@ -280,6 +293,10 @@ _HTML = """<!DOCTYPE html>
   <h4>🤖 Model Selection</h4>
   <p>Choose an AI model from OpenRouter. Free models work well for most documents. Paid models produce higher quality for complex subjects.</p>
   <p>Click the <strong>↻</strong> button to refresh the model list from the API (cached 24h).</p>
+
+  <hr>
+  <h4>🎨 Theme</h4>
+  <p>Choose a color theme for all exported files (HTML, PDF, DOCX, EPUB). Dark is the default.</p>
 
   <hr>
   <h4>📥 Output Formats</h4>
@@ -374,6 +391,7 @@ _HTML = """<!DOCTYPE html>
     form.append('file', selectedFile);
     form.append('subject', document.getElementById('subject-input').value);
     form.append('model', document.getElementById('model-select').value);
+    form.append('theme', document.getElementById('theme-select').value);
     form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
     const ctxFiles = document.getElementById('context-input').files;
     for (let i = 0; i < ctxFiles.length; i++) form.append('context_files', ctxFiles[i]);
@@ -487,6 +505,7 @@ def create_app() -> "FastAPI":  # type: ignore
         subject: str = Form(""),
         model: str = Form("meta-llama/llama-3.1-8b-instruct:free"),
         with_answers: str = Form(""),
+        theme: str = Form("dark"),
         context_files: list[UploadFile] = File(default=[]),
     ):
         api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("STUDYCRAFT_API_KEY")
@@ -522,6 +541,7 @@ def create_app() -> "FastAPI":  # type: ignore
             bool(with_answers),
             ctx_paths,
             store,
+            theme,
         )
         return JSONResponse({"job_id": job_id})
 
@@ -577,6 +597,7 @@ async def _run_job(
     with_answers: bool = False,
     context_files: list[str] | None = None,
     store: "object | None" = None,
+    theme: str = "dark",
 ):
     """Background job that runs StudyCraft and updates the job store."""
     try:
@@ -602,6 +623,7 @@ async def _run_job(
             on_progress=_on_progress,
             with_answers=with_answers,
             context_files=context_files,
+            theme=theme,
         )
 
         store.update(

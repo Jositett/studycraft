@@ -138,6 +138,12 @@ def generate(
         "--clear-cache",
         help="Delete cached chapters before running",
     ),
+    theme: Optional[str] = typer.Option(
+        None,
+        "--theme",
+        "-t",
+        help="Export theme (dark, light, nord, solarized, dracula, github, monokai, ocean, rose-pine)",
+    ),
 ) -> None:
     """[bold]Generate[/bold] a full practice guide from any document."""
     doc_path = Path(document)
@@ -181,6 +187,7 @@ def generate(
             with_answers=with_answers,
             context_files=context,
             workers=workers,
+            theme=theme,
         )
     except ValueError as exc:
         console.print(f"[red]✗ Error:[/red] {exc}")

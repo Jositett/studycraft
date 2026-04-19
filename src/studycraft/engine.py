@@ -76,6 +76,7 @@ class StudyCraft:
         on_progress: ProgressCallback = None,
         context_files: list[str | Path] | None = None,
         workers: int = 1,
+        theme: str | None = None,
     ) -> dict[str, Path]:
         """
         Full pipeline: load -> detect -> index -> generate -> export.
@@ -155,7 +156,10 @@ class StudyCraft:
         from .export import export_all
 
         return export_all(
-            combined, self.output_dir, base_name=f"{safe_name}_Practice_Guide"
+            combined,
+            self.output_dir,
+            base_name=f"{safe_name}_Practice_Guide",
+            theme=theme,
         )
 
     # -- Generation (sequential or parallel) -----------------------------------
