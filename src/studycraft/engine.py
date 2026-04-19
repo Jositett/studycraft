@@ -536,11 +536,23 @@ Format as clean Markdown with clear numbering."""
 
 def _infer_subject(doc_path: Path, text: str) -> str:
     """
-    Guess the subject from the filename or first non-empty line of text.
+    Guess the subject from the document text.
+    Skips junk lines (page numbers, dates, short fragments).
     Falls back to the filename stem.
     """
+    skip_patterns = re.compile(
+        r"^(\d+|page\s*\d+|table of contents|copyright|all rights|isbn|\d{4}[-/]\d{2})",
+        re.IGNORECASE,
+    )
     for line in text.splitlines():
         stripped = line.strip()
-        if stripped and len(stripped) < 100:
-            return stripped
+        if not stripped or len(stripped) < 5 or len(stripped) > 100:
+            continue
+        if skip_patterns.match(stripped):
+            continue
+        # Skip lines that are mostly punctuation or numbers
+        alpha = sum(1 for c in stripped if c.isalpha())
+        if alpha < len(stripped) * 0.4:
+            continue
+        return stripped
     return doc_path.stem.replace("_", " ").replace("-", " ").title()
