@@ -16,30 +16,30 @@ from pathlib import Path
 
 # ── Dependency guard ──────────────────────────────────────────────────────────
 try:
-    from fastapi import (
-        BackgroundTasks,
-        Depends,
-        FastAPI,
-        File,
-        Form,
-        HTTPException,
-        Security,
-        UploadFile,
-    )
-    from fastapi.responses import (
-        FileResponse,
-        HTMLResponse,
-        JSONResponse,
-        StreamingResponse,
-    )
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Security,
+    UploadFile,
+)
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    StreamingResponse,
+)
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from contextlib import asynccontextmanager
 
-    _FASTAPI_AVAILABLE = True
+_FASTAPI_AVAILABLE = True
 except ImportError:
     _FASTAPI_AVAILABLE = False
 
 from jinja2 import Environment, PackageLoader, select_autoescape
-
 from .jobstore import JobStore
 
 UPLOAD_DIR = Path("uploads")
@@ -69,6 +69,17 @@ _jinja_env = Environment(
 )
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: initialize JobStore singleton
+    global _store
+    _store = JobStore(db_path=OUTPUT_DIR / "jobs.db")
+    yield
+    # Shutdown: close DB connection
+    if _store:
+        _store._conn.close()
+
+
 def create_app() -> FastAPI:  # type: ignore
     if not _FASTAPI_AVAILABLE:
         raise ImportError(
@@ -76,17 +87,7 @@ def create_app() -> FastAPI:  # type: ignore
             "  uv add fastapi uvicorn jinja2 python-multipart"
         )
 
-     app = FastAPI(title="StudyCraft", version="0.9.1")
-
-    @app.on_event("startup")
-    async def _startup():
-        global _store
-        _store = JobStore(db_path=OUTPUT_DIR / "jobs.db")
-
-    @app.on_event("shutdown")
-    async def _shutdown():
-        if _store:
-            _store._conn.close()
+    app = FastAPI(title="StudyCraft", version="0.9.1", lifespan=lifespan)
 
     @app.get("/favicon.svg")
     async def favicon():

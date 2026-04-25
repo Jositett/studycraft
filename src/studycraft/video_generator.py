@@ -58,6 +58,18 @@ class VideoGenerator:
         self._output_dir = Path(output_dir)
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Check if the model is free; warn if it's a paid model
+        try:
+            model_info = get_model(self._model)
+            if model_info and not model_info.get("is_free", False):
+                console.print(
+                    f"[yellow]⚠ Warning:[/yellow] Model '{self._model}' is not marked as free. "
+                    f"You may incur costs when using this video generation model. "
+                    f"Set STUDYCRAFT_VIDEO_MODEL to a free model to avoid charges."
+                )
+        except Exception:
+            pass  # Silently ignore if model lookup fails
+
     def _check_free_model(self) -> bool:
         """Verify the configured model is free."""
         try:

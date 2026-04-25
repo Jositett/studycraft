@@ -25,10 +25,10 @@
 ## Phase 2 — Web UI (Complete the scaffold)
 
 ### 2.1 Real-time progress
-- [ ] Wire engine events into `_jobs[job_id]` updates (currently only 2 progress points)
-- [ ] Add chapter-level progress: "Generating chapter 3 of 12…"
-- [ ] Stream LLM tokens to the browser via SSE (Server-Sent Events)
-- [ ] Show detected outline in the UI before generation starts
+- [x] Wire engine events into `_jobs[job_id]` updates (chapter-level progress)
+- [x] Stream LLM tokens to the browser via SSE (Server-Sent Events)
+- [x] Show detected outline in the UI before generation starts
+- [x] Parallel worker control — `on_check_control` respected in `ThreadPoolExecutor` path
 
 ### 2.2 Multi-file support
 - [ ] Allow uploading multiple supplementary PDFs (merged into RAG, not all generated)
@@ -36,24 +36,20 @@
 
 ### 2.3 Output management
 - [ ] Job history page — list all past generated guides
-- [x] Store jobs in SQLite (replace in-memory `_jobs` dict)
+- [x] Store jobs in SQLite (replaced in-memory `_jobs` dict with `jobstore.py`)
 - [ ] Auto-cleanup of old job files after 24 hours
 
 ### 2.4 API
 - [ ] `POST /api/generate` already exists — document and stabilise
-- [ ] Add `GET /api/jobs` for history
-- [ ] Auth header support so the web UI can be deployed safely
+- [x] Add `GET /api/jobs` for history (already existed, now verified)
+- [x] Auth header support so the web UI can be deployed safely (STUDYCRAFT_WEB_TOKEN)
 
 ---
 
 ## Phase 3 — Generation Quality
 
 ### 3.1 Output validation
-- [x] `validator.py` — check each generated chapter for:
-  - All 8 section headings present
-  - At least 3 worked examples
-  - All 10 quiz questions populated
-  - No unfilled `[...]` placeholders remaining
+- [x] `validator.py` — checks sections, examples, quiz, placeholders
 - [x] Auto-retry once on validation failure (different temperature)
 - [ ] `uv run studycraft validate output/guide.md` command
 

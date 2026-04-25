@@ -5091,7 +5091,7 @@ wheels = [
 
 [[package]]
 name = "studycraft"
-version = "0.9.0"
+version = "0.9.1"
 source = { editable = "." }
 dependencies = [
     { name = "chromadb" },
@@ -5100,7 +5100,6 @@ dependencies = [
     { name = "fastapi" },
     { name = "fpdf2" },
     { name = "jinja2" },
-    { name = "kittentts" },
     { name = "markdown" },
     { name = "openai" },
     { name = "pygments" },
@@ -5129,6 +5128,9 @@ tts-chatterbox = [
 tts-coqui = [
     { name = "coqui-tts" },
 ]
+tts-kitten = [
+    { name = "kittentts" },
+]
 video = [
     { name = "videopython" },
 ]
@@ -5153,7 +5155,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.136.0" },
     { name = "fpdf2", specifier = ">=2.8.3" },
     { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "kittentts", url = "https://github.com/KittenML/KittenTTS/releases/download/0.8.1/kittentts-0.8.1-py3-none-any.whl" },
+    { name = "kittentts", marker = "extra == 'tts-kitten'", url = "https://github.com/KittenML/KittenTTS/releases/download/0.8.1/kittentts-0.8.1-py3-none-any.whl" },
     { name = "markdown", specifier = ">=3.10.2" },
     { name = "openai", specifier = ">=1.82.0" },
     { name = "playwright", marker = "extra == 'pdf'", specifier = ">=1.50.0" },
@@ -5169,7 +5171,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.44.0" },
     { name = "videopython", marker = "extra == 'video'", specifier = ">=0.24.0" },
 ]
-provides-extras = ["pdf", "tts-chatterbox", "tts-coqui", "tts", "video"]
+provides-extras = ["pdf", "tts-kitten", "tts-chatterbox", "tts-coqui", "tts", "video"]
 
 [package.metadata.requires-dev]
 dev = [

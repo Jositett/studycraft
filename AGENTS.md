@@ -41,8 +41,10 @@
 **This is a uv project. Never use `pip`, `pip3`, or `python -m pip`.**
 
 ```bash
-uv sync                                  # Install dependencies (no PDF support)
+uv sync                                  # Core install (no TTS, no PDF)
 uv sync --extra pdf                      # Install with PDF support (playwright)
+uv sync --extra tts-kitten               # Install KittenTTS for audio generation
+uv sync --extra tts                      # Install all TTS engines (kitten + chatterbox + coqui)
 uv run studycraft                        # Launch web UI (default)
 ```
 
@@ -83,9 +85,10 @@ uv run studycraft generate-audio "guide.md" --tts-engine chatterbox --tts-voice 
 uv run studycraft generate-audio "guide.md" -o output/audio/
 
 # Install TTS dependencies (as needed)
-uv add --optional tts-chatterbox      # Chatterbox (multilingual, MIT)
-uv add --optional tts-coqui       # Coqui/XTTS-v2 (1100+ langs)
-uv add --optional tts            # All TTS engines
+uv add --optional tts-kitten       # KittenTTS (lightweight, CPU-only)
+uv add --optional tts-chatterbox   # Chatterbox (multilingual, MIT)
+uv add --optional tts-coqui        # Coqui/XTTS-v2 (1100+ langs)
+uv add --optional tts              # All TTS engines
 ```
 
 ### Video Generation (Standalone)

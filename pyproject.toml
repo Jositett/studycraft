@@ -23,7 +23,6 @@ dependencies = [
     "striprtf>=0.0.26",
     "typer>=0.15.0",
     "uvicorn>=0.44.0",
-    "kittentts @ https://github.com/KittenML/KittenTTS/releases/download/0.8.1/kittentts-0.8.1-py3-none-any.whl",
 ]
 
 [project.scripts]
@@ -75,6 +74,9 @@ ignore = ["S101", "S603", "B008"]   # allow assert in tests, subprocess, Depends
 
 [project.optional-dependencies]
 pdf = ["playwright>=1.50.0"]
+tts-kitten = [
+    "kittentts @ https://github.com/KittenML/KittenTTS/releases/download/0.8.1/kittentts-0.8.1-py3-none-any.whl",
+]
 tts-chatterbox = ["chatterbox-tts>=0.1.0"]
 tts-coqui = ["coqui-tts>=0.25.0"]
 tts = [

@@ -44,16 +44,24 @@ def test_run_single_chapter(tmp_path: Path):
         "3. Exercise three?\n   - Solution: ...\n"
     )
 
-    with patch("studycraft.engine.OpenAI") as MockOpenAI:
+    # Patch all external I/O: OpenAI, RAG indexing, web research
+    with (
+        patch("studycraft.engine.OpenAI") as MockOpenAI,
+        patch("studycraft.engine.RAGIndex") as MockRAG,
+        patch("studycraft.researcher.research") as MockResearch,
+    ):
         mock_client = MockOpenAI.return_value
         mock_client.chat.completions.create.return_value = mock_response
+        MockRAG.return_value.query.return_value = "Relevant context from document"
+        MockResearch.return_value = "Web research results"
 
         craft = StudyCraft(api_key="test-key", output_dir=tmp_path / "out")
+        craft.rag = MockRAG.return_value  # Replace RAG instance
         # Run only chapter 1
         result = craft.run(doc, only_chapter=1, workers=1)
 
-    # Check result contains expected formats
-    assert "md" in result or len(result) > 0
-    # If export succeeded, markdown file should exist
+    # Check result contains expected formats (export produces markdown + html + pdf/docx/epub attempts)
+    assert isinstance(result, dict)
+    # Markdown file should exist
     md_files = list(Path(craft.output_dir).glob("*.md"))
-    assert len(md_files) >= 1
+    assert len(md_files) >= 1, "Markdown export missing"
