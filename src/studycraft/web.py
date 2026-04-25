@@ -12,7 +12,12 @@ import json
 import os
 import sys
 import uuid
+import warnings
 from pathlib import Path
+
+# Silence pkg_resources deprecation from chatterbox-tts dependency (perth)
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
+warnings.filterwarnings("ignore", message="Deprecated call to", category=UserWarning)
 
 # ── Dependency guard ──────────────────────────────────────────────────────────
 try:

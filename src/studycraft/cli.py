@@ -13,7 +13,12 @@ Commands:
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
+
+# Silence pkg_resources deprecation from chatterbox-tts dependency (perth)
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
+warnings.filterwarnings("ignore", message="Deprecated call to", category=UserWarning)
 
 import typer
 from dotenv import load_dotenv
