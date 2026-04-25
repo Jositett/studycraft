@@ -16,6 +16,14 @@ from rich.console import Console
 
 console = Console()
 
+# ── Optional videopython dependency ───────────────────────────────────────────
+try:
+    import videopython  # noqa: F401
+
+    _VIDEOPYTHON_AVAILABLE = True
+except ImportError:
+    _VIDEOPYTHON_AVAILABLE = False
+
 
 class VideoComposer:
     """
@@ -39,16 +47,7 @@ class VideoComposer:
         self._output_dir = Path(output_dir)
         self._output_dir.mkdir(parents=True, exist_ok=True)
         self._theme = theme
-        self._videopython_available = self._check_videopython()
-
-    def _check_videopython(self) -> bool:
-        """Check if videopython is available."""
-        try:
-            import videopython  # noqa: F401
-
-            return True
-        except ImportError:
-            return False
+        self._videopython_available = _VIDEOPYTHON_AVAILABLE
 
     def compose_chapter_video(
         self,

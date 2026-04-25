@@ -45,10 +45,12 @@ def test_run_single_chapter(tmp_path: Path):
     )
 
     # Patch all external I/O: OpenAI, RAG indexing, web research
+    # Note: `research` is imported in engine.py as `from .researcher import research`,
+    # so we must patch it in the engine module's namespace, not the researcher module.
     with (
         patch("studycraft.engine.OpenAI") as MockOpenAI,
         patch("studycraft.engine.RAGIndex") as MockRAG,
-        patch("studycraft.researcher.research") as MockResearch,
+        patch("studycraft.engine.research") as MockResearch,
     ):
         mock_client = MockOpenAI.return_value
         mock_client.chat.completions.create.return_value = mock_response

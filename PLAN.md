@@ -51,7 +51,7 @@
 ### 3.1 Output validation
 - [x] `validator.py` — checks sections, examples, quiz, placeholders
 - [x] Auto-retry once on validation failure (different temperature)
-- [ ] `uv run studycraft validate output/guide.md` command
+- [x] `uv run studycraft validate output/guide.md` command
 
 ### 3.2 Smarter prompting
 - [ ] Inject one complete example chapter as a few-shot prefix
