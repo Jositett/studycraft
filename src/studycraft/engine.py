@@ -428,11 +428,19 @@ class StudyCraft:
             f"({result.summary()}) -- retrying...[/yellow]"
         )
         time.sleep(self.rate_limit_seconds)
+
+        # Total structural failure (>4 missing sections): switch model before retrying
+        if len(result.missing_sections) > 4:
+            console.print(
+                f"  [yellow]Ch {chapter['num']} total failure — switching model before retry[/yellow]"
+            )
+            self._try_switch_model()
+
         content = self._generate_chapter(chapter, subject, temperature=0.5, difficulty=difficulty)
         retry_result = validate_chapter(content, label=f"Ch {chapter['num']}")
         if not retry_result.passed:
             console.print(
-                f"  [yellow]Ch {chapter['num']} retry still has issues:[/yellow] {result.summary()}"
+                f"  [yellow]Ch {chapter['num']} retry still has issues:[/yellow] {retry_result.summary()}"
             )
         return content
 
@@ -542,7 +550,8 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
             )
 
     def _llm_call_with_backoff(
-        self, prompt: str, temperature: float = 0.3, max_attempts: int = 4
+        self, prompt: str, temperature: float = 0.3, max_attempts: int = 4,
+        timeout: int = 90,
     ) -> str:
         """Call the LLM with exponential backoff and auto model switching."""
         last_exc = None
@@ -554,10 +563,17 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                     messages=[{"role": "user", "content": prompt}],
                     temperature=temperature,
                     max_tokens=4500,
+                    timeout=timeout,
                 )
                 content = resp.choices[0].message.content
-                if content is None:
-                    raise ValueError("LLM returned empty response")
+                # Empty response is transient — retry with backoff before switching
+                if not content or not content.strip():
+                    if attempt < max_attempts - 1:
+                        wait = self.rate_limit_seconds * (2 ** attempt)
+                        console.print(f"  [yellow]Empty response, retrying in {wait}s...[/yellow]")
+                        time.sleep(wait)
+                        continue
+                    raise ValueError("LLM returned empty response after retries")
                 return content.strip()
             except Exception as exc:
                 last_exc = exc
@@ -641,6 +657,9 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
         """Generate an answer key from all chapter quiz questions and exercises."""
         sections = []
         for content in chapter_contents:
+            # Skip failed chapters — they have no usable quiz content
+            if not content or "<!-- Generation failed" in content:
+                continue
             for heading in ("Chapter Quiz", "Practice Exercises"):
                 parts = re.split(rf"(?i)##\s*\d*\.?\s*{heading}", content)
                 if len(parts) > 1:
