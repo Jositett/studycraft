@@ -444,8 +444,7 @@ ROSE_PINE = Theme(
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 THEMES: dict[str, Theme] = {
-    t.name: t
-    for t in [DARK, LIGHT, NORD, SOLARIZED, DRACULA, GITHUB, MONOKAI, OCEAN, ROSE_PINE]
+    t.name: t for t in [DARK, LIGHT, NORD, SOLARIZED, DRACULA, GITHUB, MONOKAI, OCEAN, ROSE_PINE]
 }
 
 DEFAULT_THEME = "dark"

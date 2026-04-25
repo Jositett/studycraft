@@ -7,6 +7,7 @@ the most relevant chunks as grounding context.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from rich.console import Console
@@ -37,7 +38,8 @@ class RAGIndex:
         if not chunks:
             return 0
 
-        ids = [f"{source_name}_{i}" for i in range(len(chunks))]
+        safe_source = re.sub(r"[^\w-]", "_", source_name)
+        ids = [f"{safe_source}_{i}" for i in range(len(chunks))]
 
         # Delete old entries for this source to avoid duplication on re-runs
         try:
@@ -47,9 +49,7 @@ class RAGIndex:
         except Exception:
             pass
 
-        metadatas = [
-            {"source": source_name, "chunk_index": i} for i in range(len(chunks))
-        ]
+        metadatas = [{"source": source_name, "chunk_index": i} for i in range(len(chunks))]
 
         self._col.add(documents=chunks, ids=ids, metadatas=metadatas)
         console.print(

@@ -12,8 +12,7 @@ dependencies = [
     "fpdf2>=2.8.3",
     "jinja2>=3.1.6",
     "markdown>=3.10.2",
-    "openai>=2.32.0",
-    "playwright>=1.52.0",
+    "openai>=1.82.0",
     "pygments>=2.18.0",
     "pypdf>=6.10.2",
     "python-docx>=1.1.0",
@@ -24,11 +23,15 @@ dependencies = [
     "striprtf>=0.0.26",
     "typer>=0.15.0",
     "uvicorn>=0.44.0",
+    "kittentts @ https://github.com/KittenML/KittenTTS/releases/download/0.8.1/kittentts-0.8.1-py3-none-any.whl",
 ]
 
 [project.scripts]
 studycraft     = "studycraft.cli:main"
 studycraft-web = "studycraft.web:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]
@@ -36,9 +39,48 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/studycraft"]
+include = ["src/studycraft/templates/*"]
+
+[tool.uv]
+# Force CPU-only PyTorch — avoids pulling ~2GB CUDA wheels that conflict on Windows/CPU machines.
+# This is the same fix used in the Dockerfile (UV_TORCH_BACKEND=cpu).
+# Without this, `uv sync` may silently remove packages mid-resolution when the CUDA index conflicts.
+torch-backend = "cpu"
+
+[tool.uv.pip]
+# Always reinstall the editable package on sync so CLI entry points are never lost
+reinstall-package = ["studycraft"]
 
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.25",
     "ruff>=0.4",
+    "httpx>=0.27",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "S"]
+ignore = ["S101", "S603", "B008"]   # allow assert in tests, subprocess, Depends()
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]
+
+[project.optional-dependencies]
+pdf = ["playwright>=1.50.0"]
+tts-chatterbox = ["chatterbox-tts>=0.1.0"]
+tts-coqui = ["coqui-tts>=0.25.0"]
+tts = [
+    "chatterbox-tts>=0.1.0",
+    "coqui-tts>=0.25.0",
+]
+video = [
+    "videopython>=0.24.0",
 ]

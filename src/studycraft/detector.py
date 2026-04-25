@@ -27,6 +27,7 @@ Post-processing:
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import TypedDict
@@ -70,9 +71,7 @@ _ROMAN_MAP = [
     (1, "I"),
 ]
 
-_ROMAN_RE = re.compile(
-    r"^(M{0,3})(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$", re.IGNORECASE
-)
+_ROMAN_RE = re.compile(r"^(M{0,3})(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$", re.IGNORECASE)
 
 
 def _roman_to_int(s: str) -> int | None:
@@ -129,12 +128,34 @@ _SKIP_PATTERN = re.compile(
 # ── Main detector ─────────────────────────────────────────────────────────────
 
 
-def detect_chapters(text: str) -> list[Chapter]:
+def detect_chapters(text: str, llm_client=None) -> list[Chapter]:
     lines = [line.rstrip() for line in text.splitlines()]
 
     result = _detect_numbered(lines)
     if not result or len(result[0]) < 2:
         result = _detect_caps(lines)
+
+    # LLM-assisted fallback if regex strategies yielded <= 1 chapter
+    if (not result or len(result[0]) < 2) and llm_client is not None:
+        llm_chapters = _llm_toc_extraction(text[:4000], llm_client)
+        if llm_chapters:
+            # Build spans by locating chapter titles in the text lines
+            spans = []
+            for ch in llm_chapters:
+                title_lower = ch["title"].lower()
+                start_line = 0
+                for i, line in enumerate(lines):
+                    if title_lower in line.lower():
+                        start_line = i
+                        break
+                spans.append(_Span(num=ch["num"], title=ch["title"], start_line=start_line))
+            for i, sp in enumerate(spans):
+                sp.end_line = spans[i + 1].start_line - 1 if i + 1 < len(spans) else len(lines) - 1
+            result = (
+                [Chapter(num=s.num, title=s.title, subchapters=[], text="") for s in spans],
+                spans,
+            )
+
     if not result or len(result[0]) < 2:
         result = _fixed_windows(text)
 
@@ -186,13 +207,9 @@ def _detect_numbered(lines: list[str]) -> tuple[list[Chapter], list[_Span]]:
 
     # assign end lines
     for i, span in enumerate(spans):
-        span.end_line = (
-            spans[i + 1].start_line - 1 if i + 1 < len(spans) else len(lines) - 1
-        )
+        span.end_line = spans[i + 1].start_line - 1 if i + 1 < len(spans) else len(lines) - 1
 
-    return [
-        Chapter(num=s.num, title=s.title, subchapters=[], text="") for s in spans
-    ], spans
+    return [Chapter(num=s.num, title=s.title, subchapters=[], text="") for s in spans], spans
 
 
 def _detect_caps(lines: list[str]) -> tuple[list[Chapter], list[_Span]]:
@@ -200,21 +217,15 @@ def _detect_caps(lines: list[str]) -> tuple[list[Chapter], list[_Span]]:
     for i, line in enumerate(lines):
         stripped = line.strip()
         if _CAPS_PATTERN.match(stripped):
-            spans.append(
-                _Span(num=str(len(spans) + 1), title=stripped.title(), start_line=i)
-            )
+            spans.append(_Span(num=str(len(spans) + 1), title=stripped.title(), start_line=i))
 
     if len(spans) < 2:
         return [], []
 
     for i, span in enumerate(spans):
-        span.end_line = (
-            spans[i + 1].start_line - 1 if i + 1 < len(spans) else len(lines) - 1
-        )
+        span.end_line = spans[i + 1].start_line - 1 if i + 1 < len(spans) else len(lines) - 1
 
-    return [
-        Chapter(num=s.num, title=s.title, subchapters=[], text="") for s in spans
-    ], spans
+    return [Chapter(num=s.num, title=s.title, subchapters=[], text="") for s in spans], spans
 
 
 def _fixed_windows(
@@ -234,12 +245,43 @@ def _fixed_windows(
         if len(first_line) < 80:
             title = first_line.strip()
         chapters.append(Chapter(num=str(num), title=title, subchapters=[], text=chunk))
-        spans.append(
-            _Span(num=str(num), title=title, start_line=i, end_line=i + window)
-        )
+        spans.append(_Span(num=str(num), title=title, start_line=i, end_line=i + window))
         i += window - overlap
         num += 1
     return chapters, spans
+
+
+def _llm_toc_extraction(text: str, llm_client) -> list[Chapter] | None:
+    """Use LLM to extract the table of contents from a text snippet.
+    Returns a list of Chapter dicts (num, title, subchapters=[], text="") or None on failure."""
+    prompt = (
+        "Extract the table of contents (chapter numbers and titles) from the following document excerpt. "
+        "Return ONLY a JSON array of objects, each with 'num' (string) and 'title' (string). "
+        'Do not include any other text. Example: [{"num": "1", "title": "Introduction"}, ...]\n\n'
+        + text
+    )
+    try:
+        resp = llm_client.chat.completions.create(
+            model="openrouter/free",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=500,
+        )
+        content = resp.choices[0].message.content
+        # Strip markdown code fences if present
+        content = re.sub(r"^```(?:json)?\n?", "", content)
+        content = re.sub(r"\n```$", "", content)
+        data = json.loads(content)
+        chapters: list[Chapter] = []
+        for item in data:
+            num = str(item.get("num", "")) or str(len(chapters) + 1)
+            title = item.get("title", "").strip()
+            if not title:
+                continue
+            chapters.append({"num": num, "title": title, "subchapters": [], "text": ""})
+        return chapters if len(chapters) >= 2 else None
+    except Exception:
+        return None
 
 
 # ── Attach full text to chapters ──────────────────────────────────────────────
@@ -263,17 +305,11 @@ def _detect_subchapters(chapters: list[Chapter]) -> None:
             for pat in _SUB_PATTERNS:
                 m = pat.match(stripped)
                 if m:
-                    sub_spans.append(
-                        _Span(num=m.group(1), title=m.group(2).strip(), start_line=i)
-                    )
+                    sub_spans.append(_Span(num=m.group(1), title=m.group(2).strip(), start_line=i))
                     break
 
         for j, span in enumerate(sub_spans):
-            end = (
-                sub_spans[j + 1].start_line - 1
-                if j + 1 < len(sub_spans)
-                else len(lines) - 1
-            )
+            end = sub_spans[j + 1].start_line - 1 if j + 1 < len(sub_spans) else len(lines) - 1
             subs.append(
                 SubChapter(
                     num=span.num,

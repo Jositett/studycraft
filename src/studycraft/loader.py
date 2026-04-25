@@ -25,8 +25,7 @@ def load_document(path: Path) -> str:
 
     if suffix not in SUPPORTED:
         raise ValueError(
-            f"Unsupported file type '{suffix}'. "
-            f"Supported: {', '.join(sorted(SUPPORTED))}"
+            f"Unsupported file type '{suffix}'. Supported: {', '.join(sorted(SUPPORTED))}"
         )
 
     console.print(f"[cyan]📄 Loading:[/cyan] {path.name}  [dim]({suffix})[/dim]")
@@ -77,16 +76,24 @@ def _load_rtf(path: Path) -> str:
 
 
 def _load_epub(path: Path) -> str:
-    from ebooklib import epub  # type: ignore
-    from ebooklib import ITEM_DOCUMENT  # type: ignore
     import re
+
+    from ebooklib import (
+        ITEM_DOCUMENT,  # type: ignore
+        epub,  # type: ignore
+    )
 
     book = epub.read_epub(str(path), options={"ignore_ncx": True})
     texts = []
     for item in book.get_items_of_type(ITEM_DOCUMENT):
         html = item.get_content().decode("utf-8", errors="replace")
+        # Replace block-level tags with newlines to preserve paragraph separation
+        html = re.sub(r"<(p|div|h\d|li|br|tr)[^>]*>", "\n", html, flags=re.IGNORECASE)
+        # Replace remaining inline tags with spaces
         clean = re.sub(r"<[^>]+>", " ", html)
-        clean = re.sub(r"\s+", " ", clean).strip()
+        # Collapse whitespace
+        clean = re.sub(r"[ \t]+", " ", clean)
+        clean = re.sub(r"\n{3,}", "\n\n", clean).strip()
         if clean:
             texts.append(clean)
     return "\n\n".join(texts)

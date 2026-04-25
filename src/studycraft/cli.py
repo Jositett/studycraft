@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
 
 import typer
 from dotenv import load_dotenv
@@ -93,13 +92,13 @@ def generate(
         "-m",
         help="OpenRouter model ID",
     ),
-    subject: Optional[str] = typer.Option(
+    subject: str | None = typer.Option(
         None,
         "--subject",
         "-s",
         help="Override the auto-detected subject name",
     ),
-    chapter: Optional[int] = typer.Option(
+    chapter: int | None = typer.Option(
         None,
         "--chapter",
         "-c",
@@ -121,7 +120,7 @@ def generate(
         "--with-answers",
         help="Generate an answer key after the guide",
     ),
-    context: Optional[list[str]] = typer.Option(
+    context: list[str] | None = typer.Option(
         None,
         "--context",
         "-x",
@@ -138,7 +137,7 @@ def generate(
         "--clear-cache",
         help="Delete cached chapters before running",
     ),
-    theme: Optional[str] = typer.Option(
+    theme: str | None = typer.Option(
         None,
         "--theme",
         "-t",
@@ -149,6 +148,41 @@ def generate(
         "--difficulty",
         "-d",
         help="Difficulty level (beginner, intermediate, advanced)",
+    ),
+    with_audio: bool = typer.Option(
+        False,
+        "--with-audio",
+        help="Generate audio guide using TTS",
+    ),
+    tts_engine: str = typer.Option(
+        "kitten",
+        "--tts-engine",
+        help="TTS engine: kitten, chatterbox, coqui, openrouter",
+    ),
+    tts_voice: str | None = typer.Option(
+        None,
+        "--tts-voice",
+        help="Voice name (engine-specific: Bella/Jasper for kitten, etc.)",
+    ),
+    tts_speed: float = typer.Option(
+        1.0,
+        "--tts-speed",
+        help="Playback speed multiplier (0.5-2.0)",
+    ),
+    with_video: bool = typer.Option(
+        False,
+        "--with-video",
+        help="Generate video guide using OpenRouter (free models only)",
+    ),
+    video_model: str = typer.Option(
+        "google/veo-3.1",
+        "--video-model",
+        help="Video generation model (must be free)",
+    ),
+    video_resolution: str = typer.Option(
+        "720p",
+        "--video-resolution",
+        help="Video resolution: 720p or 1080p",
     ),
 ) -> None:
     """[bold]Generate[/bold] a full practice guide from any document."""
@@ -196,6 +230,13 @@ def generate(
             workers=workers,
             theme=theme,
             difficulty=difficulty,
+            with_audio=with_audio,
+            tts_engine=tts_engine,
+            tts_voice=tts_voice,
+            tts_speed=tts_speed,
+            with_video=with_video,
+            video_model=video_model,
+            video_resolution=video_resolution,
         )
     except ValueError as exc:
         console.print(f"[red]✗ Error:[/red] {exc}")
@@ -219,8 +260,8 @@ def inspect(
     doc_path = Path(document)
     _validate_file(doc_path)
 
-    from .loader import load_document
     from .detector import detect_chapters
+    from .loader import load_document
 
     console.print(f"[cyan]📄 Loading:[/cyan] {doc_path.name}")
     text = load_document(doc_path)
@@ -268,10 +309,8 @@ def inspect(
 def export(
     markdown_file: str = typer.Argument(..., help="Path to an existing .md guide"),
     output: str = typer.Option("output", "--output", "-o"),
-    name: str = typer.Option(
-        "StudyCraft_Practice_Guide", "--name", "-n", help="Base filename"
-    ),
-    theme: Optional[str] = typer.Option(
+    name: str = typer.Option("StudyCraft_Practice_Guide", "--name", "-n", help="Base filename"),
+    theme: str | None = typer.Option(
         None,
         "--theme",
         "-t",
@@ -297,6 +336,172 @@ def export(
     console.print("[green]✓ Re-export complete.[/green]")
     for fmt, path in paths.items():
         console.print(f"  [cyan]{fmt.upper()}[/cyan] → {path.resolve()}")
+
+
+@app.command()
+def generate_audio(
+    markdown_file: str = typer.Argument(..., help="Path to an existing .md guide"),
+    output: str = typer.Option(
+        "output/audio", "--output", "-o", help="Output directory for audio files"
+    ),
+    tts_engine: str = typer.Option(
+        "kitten",
+        "--tts-engine",
+        help="TTS engine: kitten, chatterbox, coqui, openrouter",
+    ),
+    tts_voice: str | None = typer.Option(
+        None,
+        "--tts-voice",
+        help="Voice name (engine-specific: Bella/Jasper for kitten, etc.)",
+    ),
+    tts_speed: float = typer.Option(
+        1.0,
+        "--tts-speed",
+        help="Playback speed multiplier (0.5-2.0)",
+    ),
+) -> None:
+    """[bold]Generate audio[/bold] from an existing Markdown guide."""
+    md_path = Path(markdown_file)
+    if not md_path.exists():
+        console.print(f"[red]✗ File not found:[/red] {md_path}")
+        raise typer.Exit(1)
+
+    from .audio_generator import AudioGenerator
+
+    console.print(f"[cyan]Loading:[/cyan] {md_path.name}")
+    text = md_path.read_text(encoding="utf-8")
+
+    # Parse chapters from markdown by headings
+    import re
+
+    console.print("[cyan]Extracting chapters...[/cyan]")
+    chapters = []
+    current_chapter = None
+    current_content = []
+
+    for line in text.split("\n"):
+        heading_match = re.match(r"^(#{1,3})\s+(.+)$", line)
+        if heading_match:
+            # Save previous chapter
+            if current_chapter:
+                current_chapter["content"] = "\n".join(current_content)
+                chapters.append(current_chapter)
+            num = heading_match.group(2)[:50]
+            current_chapter = {
+                "num": num,
+                "title": num,
+                "content": "",
+            }
+            current_content = []
+        elif current_chapter:
+            current_content.append(line)
+
+    # Don't forget the last chapter
+    if current_chapter:
+        current_chapter["content"] = "\n".join(current_content)
+        chapters.append(current_chapter)
+
+    if not chapters:
+        # Fallback: treat entire document as one chapter
+        chapters = [{"num": "1", "title": md_path.stem, "content": text}]
+
+    console.print(f"[green]Found {len(chapters)} chapters[/green]")
+
+    console.print(f"[cyan]Initializing TTS engine:[/cyan] {tts_engine}")
+    audio_gen = AudioGenerator(
+        engine_name=tts_engine,
+        voice=tts_voice,
+        speed=tts_speed,
+    )
+
+    results = audio_gen.generate_all_chapters(
+        chapters=chapters,
+        output_dir=output,
+    )
+
+    console.print("\n[bold green]🎧 Audio guide ready![/bold green]")
+    for ch_num, path in results.items():
+        console.print(f"  [cyan]{ch_num}[/cyan] → {path.resolve()}")
+
+
+@app.command()
+def generate_video(
+    markdown_file: str = typer.Argument(..., help="Path to an existing .md guide"),
+    output: str = typer.Option(
+        "output/videos", "--output", "-o", help="Output directory for video files"
+    ),
+    video_model: str = typer.Option(
+        "google/veo-3.1",
+        "--video-model",
+        help="Video generation model (must be free)",
+    ),
+    video_resolution: str = typer.Option(
+        "720p",
+        "--video-resolution",
+        help="Video resolution: 720p or 1080p",
+    ),
+) -> None:
+    """[bold]Generate video[/bold] from an existing Markdown guide using OpenRouter."""
+    md_path = Path(markdown_file)
+    if not md_path.exists():
+        console.print(f"[red]✗ File not found:[/red] {md_path}")
+        raise typer.Exit(1)
+
+    from .video_generator import VideoGenerator
+
+    console.print(f"[cyan]Loading:[/cyan] {md_path.name}")
+    text = md_path.read_text(encoding="utf-8")
+
+    # Parse chapters from markdown by headings
+    import re
+
+    console.print("[cyan]Extracting chapters...[/cyan]")
+    chapters = []
+    current_chapter = None
+    current_content = []
+
+    for line in text.split("\n"):
+        heading_match = re.match(r"^(#{1,3})\s+(.+)$", line)
+        if heading_match:
+            # Save previous chapter
+            if current_chapter:
+                current_chapter["content"] = "\n".join(current_content)
+                chapters.append(current_chapter)
+            num = heading_match.group(2)[:50]
+            current_chapter = {
+                "num": num,
+                "title": num,
+                "content": "",
+            }
+            current_content = []
+        elif current_chapter:
+            current_content.append(line)
+
+    # Don't forget the last chapter
+    if current_chapter:
+        current_chapter["content"] = "\n".join(current_content)
+        chapters.append(current_chapter)
+
+    if not chapters:
+        # Fallback: treat entire document as one chapter
+        chapters = [{"num": "1", "title": md_path.stem, "content": text}]
+
+    console.print(f"[green]Found {len(chapters)} chapters[/green]")
+
+    console.print(f"[cyan]Initializing Video Generator:[/cyan] {video_model}")
+    video_gen = VideoGenerator(
+        model=video_model,
+        output_dir=output,
+    )
+
+    results = video_gen.generate_all_chapters(
+        chapters=chapters,
+        output_dir=output,
+    )
+
+    console.print("\n[bold green]🎥 Video guide ready![/bold green]")
+    for ch_num, path in results.items():
+        console.print(f"  [cyan]{ch_num}[/cyan] → {path.resolve()}")
 
 
 @app.command()
@@ -334,9 +539,7 @@ def validate(
     if all_passed:
         console.print("\n[bold green]All chapters passed validation.[/bold green]")
     else:
-        console.print(
-            "\n[yellow]Some chapters have issues. Consider regenerating.[/yellow]"
-        )
+        console.print("\n[yellow]Some chapters have issues. Consider regenerating.[/yellow]")
 
 
 @app.command()
@@ -346,8 +549,8 @@ def gist(
 ) -> None:
     """[bold]Publish[/bold] a Markdown guide as a GitHub Gist."""
     import json
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     md_path = Path(markdown_file)
     if not md_path.exists():
@@ -393,15 +596,9 @@ def gist(
 @app.command()
 def models(
     free: bool = typer.Option(False, "--free", help="Show only free models"),
-    vision: bool = typer.Option(
-        False, "--vision", help="Show only vision-capable models"
-    ),
-    search: Optional[str] = typer.Option(
-        None, "--search", "-q", help="Search by name or ID"
-    ),
-    refresh: bool = typer.Option(
-        False, "--refresh", help="Force refresh from OpenRouter API"
-    ),
+    vision: bool = typer.Option(False, "--vision", help="Show only vision-capable models"),
+    search: str | None = typer.Option(None, "--search", "-q", help="Search by name or ID"),
+    refresh: bool = typer.Option(False, "--refresh", help="Force refresh from OpenRouter API"),
 ) -> None:
     """[bold]List[/bold] available OpenRouter models (fetched from API, cached 24h)."""
     from .model_registry import (
@@ -426,9 +623,7 @@ def models(
         result = fetch_models()
 
     if not result:
-        console.print(
-            "[yellow]No models found. Try --refresh or check your connection.[/yellow]"
-        )
+        console.print("[yellow]No models found. Try --refresh or check your connection.[/yellow]")
         raise typer.Exit(1)
 
     # Show top 30 to keep output manageable

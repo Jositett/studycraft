@@ -259,9 +259,7 @@ def export_all(
     except Exception:
         try:
             _export_pdf(full_markdown, pdf_path, base_name, t)
-            console.print(
-                f"[green]✓ PDF[/green]      → {pdf_path} [dim](fpdf2 fallback)[/dim]"
-            )
+            console.print(f"[green]✓ PDF[/green]      → {pdf_path} [dim](fpdf2 fallback)[/dim]")
             paths["pdf"] = pdf_path
         except Exception as exc:
             console.print(
@@ -284,9 +282,7 @@ def export_all(
         from .export_epub import export_epub
 
         epub_path = output_dir / f"{base_name}.epub"
-        export_epub(
-            full_markdown, epub_path, title=base_name.replace("_", " "), theme=t
-        )
+        export_epub(full_markdown, epub_path, title=base_name.replace("_", " "), theme=t)
         paths["epub"] = epub_path
     except Exception as exc:
         console.print(f"[yellow]EPUB skipped:[/yellow] {exc}")
@@ -466,9 +462,7 @@ def _wrap(body: str, title: str, t: Theme, toc_html: str = "") -> str:
     css = _build_css(t)
     toc_sidebar = ""
     if toc_html:
-        toc_sidebar = (
-            f'<nav class="toc-sidebar"><h2>\U0001f5d2 Contents</h2>{toc_html}</nav>'
-        )
+        toc_sidebar = f'<nav class="toc-sidebar"><h2>\U0001f5d2 Contents</h2>{toc_html}</nav>'
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>

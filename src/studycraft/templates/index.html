@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyCraft — Practice Guide Generator</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  :root {
+    --primary: #6d9fff; --primary-hover: #5a8af2; --accent: #a78bfa;
+    --bg: #0f1117; --surface: #1a1d2e; --surface-hover: #222640;
+    --border: #2a2f45; --border-hover: #3d4463;
+    --text: #e2e8f0; --muted: #8892b0;
+    --success: #4ade80; --error-bg: #2d1b1b; --error-border: #7f1d1d; --error-text: #fca5a5;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header {
+    background: linear-gradient(135deg, #1e2540 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    color: white; padding: 2rem 2rem 1.75rem; text-align: center;
+  }
+  header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; }
+  header h1 span { background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  header p { color: var(--muted); margin-top: .4rem; font-size: .95rem; }
+
+  main { max-width: 680px; margin: 2rem auto; padding: 0 1.25rem; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.75rem; margin-bottom: 1.25rem;
+    transition: border-color .2s;
+  }
+  .card:hover { border-color: var(--border-hover); }
+  .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; color: var(--primary); letter-spacing: -.01em; }
+
+  label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .35rem; color: var(--muted); }
+  input[type=text], select {
+    width: 100%; padding: .6rem .85rem; border: 1px solid var(--border);
+    border-radius: 8px; font-size: .9rem; margin-bottom: 1rem;
+    outline: none; transition: border-color .2s, box-shadow .2s;
+    background: var(--bg); color: var(--text);
+  }
+  select option { background: var(--surface); color: var(--text); }
+  input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(109,159,255,.15); }
+  input::placeholder { color: var(--muted); opacity: .6; }
+
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 2.25rem 1.5rem; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; margin-bottom: 1.25rem;
+  }
+  .drop-zone:hover, .drop-zone.active { border-color: var(--primary); background: rgba(109,159,255,.06); }
+  .drop-zone.has-file { border-color: var(--success); border-style: solid; background: rgba(74,222,128,.05); }
+  .drop-zone p { color: var(--muted); font-size: .85rem; margin-top: .5rem; }
+  .drop-zone p strong { color: var(--primary); }
+  .drop-zone .formats { font-size: .75rem; opacity: .6; margin-top: .25rem; }
+  .drop-zone input { display: none; }
+  .file-name { color: var(--success); font-weight: 600; margin-top: .5rem; font-size: .9rem; }
+
+  .checkbox-row {
+    display: inline-flex; align-items: center; gap: .5rem;
+    margin-bottom: 1rem; cursor: pointer; font-size: .9rem;
+  }
+  .checkbox-row input[type=checkbox] {
+    width: 1.1rem; height: 1.1rem; accent-color: var(--primary); cursor: pointer;
+  }
+
+  .ctx-drop-zone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 1.25rem 1rem; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; margin-bottom: .5rem;
+  }
+  .ctx-drop-zone:hover, .ctx-drop-zone.active { border-color: var(--primary); background: rgba(109,159,255,.06); }
+  .ctx-drop-zone.has-files { border-color: var(--success); border-style: solid; background: rgba(74,222,128,.05); }
+  .ctx-drop-zone p { color: var(--muted); font-size: .8rem; margin-top: .35rem; }
+  .ctx-drop-zone p strong { color: var(--primary); }
+  .ctx-drop-zone input { display: none; }
+  .ctx-file-list { margin: .5rem 0 1rem; font-size: .8rem; }
+  .ctx-file-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .3rem .5rem; background: var(--bg); border-radius: 6px; margin-bottom: .25rem;
+  }
+  .ctx-file-item span { color: var(--success); font-weight: 500; }
+  .ctx-file-item button {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: .9rem; padding: 0 .25rem; transition: color .15s;
+  }
+  .ctx-file-item button:hover { color: var(--error-text); }
+
+  .context-hint { color: var(--muted); font-size: .75rem; margin: 0 0 1rem; opacity: .7; }
+
+  button[type=submit] {
+    width: 100%; padding: .85rem; font-size: 1rem; font-weight: 700;
+    border: none; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: #fff; transition: opacity .2s, transform .1s;
+  }
+  button[type=submit]:hover { opacity: .9; }
+  button[type=submit]:active { transform: scale(.99); }
+  button[type=submit]:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  .progress-card { display: none; }
+  .progress-bar-wrap {
+    height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; margin: 1rem 0;
+  }
+  .progress-bar {
+    height: 100%; width: 0%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transition: width .5s ease;
+  }
+  .status-text { font-size: .85rem; color: var(--muted); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+  .status-text.running { animation: pulse 2s ease-in-out infinite; }
+
+  .results { display: none; }
+  .dl-grid { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .dl-btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .55rem 1.1rem; border-radius: 8px;
+    font-size: .85rem; font-weight: 600; text-decoration: none;
+    transition: opacity .2s, transform .1s; border: 1px solid var(--border);
+    background: var(--surface-hover); color: var(--text);
+  }
+  .dl-btn:hover { opacity: .85; transform: translateY(-1px); }
+  .dl-pdf  { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .dl-html { background: rgba(109,159,255,.15); color: var(--primary); border-color: var(--primary); }
+
+  .error {
+    color: var(--error-text); background: var(--error-bg); border: 1px solid var(--error-border);
+    border-radius: 8px; padding: .75rem 1rem; margin-top: 1rem; font-size: .85rem;
+  }
+
+  .new-btn {
+    display: inline-block; margin-top: 1rem; padding: .5rem 1rem;
+    border-radius: 8px; font-size: .85rem; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--muted);
+    transition: border-color .2s;
+  }
+  .new-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+  .key-card { border-color: var(--accent); }
+  .key-card h2 { color: var(--accent); }
+  .key-field { margin-bottom: .75rem; }
+  .key-field label { display: flex; align-items: center; gap: .4rem; }
+  .key-field .key-status { font-size: .7rem; padding: .1rem .4rem; border-radius: 4px; font-weight: 600; }
+  .key-field .key-status.set { background: rgba(74,222,128,.15); color: var(--success); }
+  .key-field .key-status.missing { background: var(--error-bg); color: var(--error-text); }
+  .key-field input[type=password] {
+    width: 100%; padding: .6rem .85rem; border: 1px solid var(--border);
+    border-radius: 8px; font-size: .9rem; outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    background: var(--bg); color: var(--text);
+  }
+  .key-field input[type=password]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(109,159,255,.15); }
+  .key-field input[type=password]::placeholder { color: var(--muted); opacity: .6; }
+  .key-hint { font-size: .7rem; color: var(--muted); margin-top: .2rem; opacity: .7; }
+  .key-hint a { color: var(--primary); text-decoration: none; }
+  .key-save-btn {
+    margin-top: .5rem; padding: .5rem 1rem; font-size: .85rem; font-weight: 600;
+    border: 1px solid var(--accent); border-radius: 8px; cursor: pointer;
+    background: rgba(167,139,250,.1); color: var(--accent); transition: opacity .2s;
+  }
+  .key-save-btn:hover { opacity: .8; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  html { scrollbar-color: var(--border-hover) var(--bg); scrollbar-width: thin; }
+
+  /* Layout with aside */
+  .page-layout { display: flex; gap: 1.5rem; max-width: 1060px; margin: 2rem auto; padding: 0 1.25rem; align-items: flex-start; }
+  main { flex: 1; min-width: 0; margin: 0; padding: 0; max-width: none; }
+  aside {
+    width: 300px; flex-shrink: 0; position: sticky; top: 1.5rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.25rem; font-size: .8rem; color: var(--muted); line-height: 1.6;
+    max-height: calc(100vh - 3rem); overflow-y: auto;
+  }
+  aside h3 { color: var(--primary); font-size: .85rem; font-weight: 700; margin-bottom: .75rem; }
+  aside h4 { color: var(--text); font-size: .78rem; font-weight: 600; margin: .9rem 0 .3rem; }
+  aside p { margin-bottom: .5rem; }
+  aside ul { padding-left: 1rem; margin-bottom: .5rem; }
+  aside li { margin-bottom: .25rem; }
+  aside code { background: var(--bg); padding: .1rem .35rem; border-radius: 4px; font-size: .75rem; }
+  aside hr { border: none; border-top: 1px solid var(--border); margin: .75rem 0; }
+
+  @media (max-width: 860px) {
+    .page-layout { flex-direction: column; }
+    aside { width: 100%; position: static; max-height: none; }
+  }
+
+  footer { text-align: center; color: var(--muted); font-size: .75rem; padding: 2rem; opacity: .6; }
+  footer a { color: var(--primary); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📖 <span>StudyCraft</span></h1>
+  <p>Craft structured, research-backed practice guides from any document</p>
+</header>
+
+<div class="page-layout">
+<main>
+  <div class="card key-card" id="key-card" style="display:none">
+    <h2>🔐 API Keys</h2>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">Keys are stored in your browser only and never saved on the server.</p>
+
+    <div class="key-field">
+      <label>OpenRouter API Key <span class="key-status" id="openrouter-status"></span></label>
+      <input type="password" id="openrouter-key" placeholder="sk-or-v1-...">
+      <p class="key-hint">Required — Get a free key at <a href="https://openrouter.ai" target="_blank">openrouter.ai</a></p>
+    </div>
+
+    <div class="key-field">
+      <label>HuggingFace Token <span class="key-status" id="hf-status"></span></label>
+      <input type="password" id="hf-key" placeholder="hf_...">
+      <p class="key-hint">Optional — Faster RAG model downloads. Get one at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co</a></p>
+    </div>
+
+    <div class="key-field">
+      <label>GitHub Token <span class="key-status" id="github-status"></span></label>
+      <input type="password" id="github-key" placeholder="ghp_...">
+      <p class="key-hint">Optional — For publishing guides as Gists. <a href="https://github.com/settings/tokens" target="_blank">Create token</a> (gist scope)</p>
+    </div>
+
+    <button type="button" class="key-save-btn" onclick="saveKeys()">Save to browser</button>
+  </div>
+
+  <div class="card" id="upload-card">
+    <h2>Generate a Practice Guide</h2>
+
+    <div class="drop-zone" id="drop-zone">
+      <svg width="40" height="40" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24">
+        <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12V4m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <p>Drag & drop your document here, or <strong>click to browse</strong></p>
+      <p>PDF · DOCX · TXT · MD · RTF · EPUB</p>
+      <input type="file" id="file-input" accept=".pdf,.docx,.txt,.md,.rtf,.epub">
+      <div class="file-name" id="file-name"></div>
+    </div>
+
+    <label for="subject-input">Subject name (optional — auto-detected if blank)</label>
+    <input type="text" id="subject-input" placeholder="e.g. Advanced Java, Calculus II, History of Art">
+
+    <label for="answers-check" class="checkbox-row">
+      <input type="checkbox" id="answers-check">
+      Generate answer key
+    </label>
+
+    <label>Additional context files (optional)</label>
+    <div class="ctx-drop-zone" id="ctx-drop-zone">
+      <svg width="24" height="24" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24">
+        <path d="M12 5v14m-7-7h14" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <p>Drag & drop context files, or <strong>click to browse</strong></p>
+      <p style="font-size:.7rem;opacity:.5">Multiple files supported · PDF · DOCX · TXT · MD · RTF · EPUB</p>
+      <input type="file" id="context-input" multiple accept=".pdf,.docx,.txt,.md,.rtf,.epub">
+    </div>
+    <div class="ctx-file-list" id="ctx-file-list"></div>
+    <p class="context-hint">Extra files indexed into RAG for richer context (not generated as chapters)</p>
+
+    <label for="model-select">Model</label>
+    <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+      <select id="model-select" style="margin-bottom:0;flex:1">
+        <option value="" disabled selected>Loading models…</option>
+      </select>
+      <button type="button" id="refresh-models-btn" onclick="refreshModels()" title="Refresh models" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.4rem .6rem;cursor:pointer;color:var(--muted);transition:border-color .2s,color .2s;display:flex;align-items:center">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <label for="theme-select">Theme</label>
+    <select id="theme-select">
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+      <option value="nord">Nord</option>
+      <option value="solarized">Solarized</option>
+      <option value="dracula">Dracula</option>
+      <option value="github">GitHub</option>
+      <option value="monokai">Monokai</option>
+      <option value="ocean">Ocean</option>
+      <option value="rose-pine">Rosé Pine</option>
+    </select>
+
+    <label for="difficulty-select">Difficulty</label>
+    <select id="difficulty-select">
+      <option value="beginner">Beginner</option>
+      <option value="intermediate" selected>Intermediate</option>
+      <option value="advanced">Advanced</option>
+    </select>
+
+    <button type="submit" id="generate-btn" onclick="startGeneration()">Generate Guide</button>
+    <div class="error" id="error-msg" style="display:none"></div>
+  </div>
+
+  <div class="card progress-card" id="progress-card">
+    <h2>⚙️ Generating your guide…</h2>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="status-text running" id="status-text">Starting up…</div>
+    <div style="display:flex;gap:.5rem;margin-top:1rem">
+      <button type="button" class="new-btn" id="pause-btn" onclick="controlJob('pause')">⏸ Pause</button>
+      <button type="button" class="new-btn" id="stop-btn" onclick="controlJob('stop')" style="border-color:var(--error-border);color:var(--error-text)">⏹ Stop</button>
+    </div>
+  </div>
+
+  <div class="card results" id="results-card">
+    <h2>✅ Guide Ready!</h2>
+    <p style="color:var(--muted);margin-bottom:1rem;font-size:.9rem">Download your practice guide:</p>
+    <div class="dl-grid" id="download-links"></div>
+    <button class="new-btn" onclick="resetUI()">Generate another</button>
+  </div>
+</main>
+
+<aside>
+  <h3>📘 Usage Guide</h3>
+
+  <h4>📄 Upload Document</h4>
+  <p>Drag & drop or click to select your source file. Supported formats:</p>
+  <ul>
+    <li><code>PDF</code> — textbooks, papers, slides</li>
+    <li><code>DOCX</code> — Word documents</li>
+    <li><code>EPUB</code> — e-books</li>
+    <li><code>TXT</code> / <code>MD</code> — plain text or Markdown</li>
+    <li><code>RTF</code> — rich text format</li>
+  </ul>
+
+  <hr>
+  <h4>✏️ Subject Name</h4>
+  <p>Optional. If left blank, StudyCraft auto-detects the subject from your document content.</p>
+
+  <hr>
+  <h4>✅ Answer Key</h4>
+  <p>When checked, a separate answer key file is generated alongside the practice guide with solutions to all quiz questions.</p>
+
+  <hr>
+  <h4>📎 Context Files</h4>
+  <p>Add supplementary files (lecture notes, references) that get indexed into RAG for richer, more accurate content. These are <em>not</em> turned into chapters.</p>
+
+  <hr>
+  <h4>🤖 Model Selection</h4>
+  <p>Choose an AI model from OpenRouter. Free models work well for most documents. Paid models produce higher quality for complex subjects.</p>
+  <p>Click the <strong>↻</strong> button to refresh the model list from the API (cached 24h).</p>
+
+  <hr>
+  <h4>🎨 Theme</h4>
+  <p>Choose a color theme for all exported files (HTML, PDF, DOCX, EPUB). Dark is the default.</p>
+
+  <hr>
+  <h4>🎯 Difficulty</h4>
+  <p>Controls the complexity of examples, exercises, and quiz questions:</p>
+  <ul>
+    <li><code>Beginner</code> — simple vocabulary, basic recall</li>
+    <li><code>Intermediate</code> — multi-step reasoning, real-world scenarios</li>
+    <li><code>Advanced</code> — production-grade, design & evaluation</li>
+  </ul>
+
+  <hr>
+  <h4>📥 Output Formats</h4>
+  <p>Once generated, download your guide in:</p>
+  <ul>
+    <li><code>MD</code> — Markdown source</li>
+    <li><code>HTML</code> — styled web page</li>
+    <li><code>PDF</code> — print-ready document</li>
+    <li><code>DOCX</code> — Word format</li>
+    <li><code>EPUB</code> — e-reader format</li>
+  </ul>
+
+  <hr>
+  <h4>💡 Tips</h4>
+  <ul>
+    <li>Larger documents produce more chapters</li>
+    <li>Well-structured docs (with headings) yield better outlines</li>
+    <li>Use context files for supplementary material</li>
+    <li>Free models have rate limits — generation may take a few minutes</li>
+  </ul>
+</aside>
+</div>
+
+<footer>StudyCraft · AI-powered practice guides · <a href="/docs">API docs</a></footer>
+
+<script>
+  // ── BYOK key management ──
+  const KEY_STORAGE = 'studycraft_keys';
+  let serverConfig = {};
+
+  function getSavedKeys() {
+    try { return JSON.parse(localStorage.getItem(KEY_STORAGE) || '{}'); } catch { return {}; }
+  }
+  function saveKeys() {
+    const keys = {
+      openrouter: document.getElementById('openrouter-key').value.trim(),
+      hf: document.getElementById('hf-key').value.trim(),
+      github: document.getElementById('github-key').value.trim(),
+    };
+    localStorage.setItem(KEY_STORAGE, JSON.stringify(keys));
+    updateKeyUI();
+  }
+  function getEffectiveKey(name) {
+    const saved = getSavedKeys();
+    return saved[name] || '';
+  }
+  function updateKeyUI() {
+    const saved = getSavedKeys();
+    const fields = [
+      { id: 'openrouter', inputId: 'openrouter-key', statusId: 'openrouter-status', serverKey: 'has_openrouter' },
+      { id: 'hf', inputId: 'hf-key', statusId: 'hf-status', serverKey: 'has_hf_token' },
+      { id: 'github', inputId: 'github-key', statusId: 'github-status', serverKey: 'has_github_token' },
+    ];
+    fields.forEach(f => {
+      const el = document.getElementById(f.statusId);
+      const input = document.getElementById(f.inputId);
+      const hasServer = serverConfig[f.serverKey];
+      const hasLocal = !!saved[f.id];
+      if (hasServer) {
+        el.textContent = 'Server'; el.className = 'key-status set';
+        input.placeholder = 'Set on server (override optional)';
+      } else if (hasLocal) {
+        el.textContent = 'Saved'; el.className = 'key-status set';
+        input.value = saved[f.id];
+      } else {
+        el.textContent = f.id === 'openrouter' ? 'Required' : 'Not set';
+        el.className = 'key-status ' + (f.id === 'openrouter' ? 'missing' : '');
+      }
+    });
+  }
+
+  async function loadConfig() {
+    try {
+      const r = await fetch('/api/config');
+      serverConfig = await r.json();
+    } catch { serverConfig = {}; }
+    document.getElementById('key-card').style.display = 'block';
+    updateKeyUI();
+  }
+  loadConfig();
+
+  async function loadModels(refresh = false) {
+    const sel = document.getElementById('model-select');
+    sel.innerHTML = '<option value="" disabled selected>Loading models…</option>';
+    try {
+      const url = refresh ? '/api/models?refresh=1' : '/api/models';
+      const r = await fetch(url);
+      const models = await r.json();
+      sel.innerHTML = '';
+      models.forEach((m, i) => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        const ctx = m.context_length ? `${Math.round(m.context_length/1000)}k` : '';
+        const cost = m.is_free ? 'Free' : 'Paid';
+        opt.textContent = `${m.name} (${cost}${ctx ? ' · ' + ctx : ''})`;
+        if (i === 0) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    } catch(e) {
+      sel.innerHTML = '<option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B (Free)</option>';
+    }
+  }
+  function refreshModels() {
+    const btn = document.getElementById('refresh-models-btn');
+    btn.style.color = 'var(--primary)';
+    btn.style.borderColor = 'var(--primary)';
+    loadModels(true).then(() => { btn.style.color = ''; btn.style.borderColor = ''; });
+  }
+  loadModels();
+
+  // Context files drop zone
+  const ctxZone = document.getElementById('ctx-drop-zone');
+  const ctxInput = document.getElementById('context-input');
+  const ctxList = document.getElementById('ctx-file-list');
+  let contextFiles = [];
+
+  ctxZone.addEventListener('click', () => ctxInput.click());
+  ctxZone.addEventListener('dragover', e => { e.preventDefault(); ctxZone.classList.add('active'); });
+  ctxZone.addEventListener('dragleave', () => ctxZone.classList.remove('active'));
+  ctxZone.addEventListener('drop', e => {
+    e.preventDefault(); ctxZone.classList.remove('active');
+    addContextFiles(e.dataTransfer.files);
+  });
+  ctxInput.addEventListener('change', () => {
+    addContextFiles(ctxInput.files);
+    ctxInput.value = '';
+  });
+
+  function addContextFiles(files) {
+    for (const f of files) {
+      if (!contextFiles.some(c => c.name === f.name && c.size === f.size)) {
+        contextFiles.push(f);
+      }
+    }
+    renderContextFiles();
+  }
+  function removeContextFile(idx) {
+    contextFiles.splice(idx, 1);
+    renderContextFiles();
+  }
+  function renderContextFiles() {
+    ctxZone.classList.toggle('has-files', contextFiles.length > 0);
+    ctxList.innerHTML = contextFiles.map((f, i) =>
+      `<div class="ctx-file-item"><span>📎 ${f.name}</span><button onclick="removeContextFile(${i})" title="Remove">✕</button></div>`
+    ).join('');
+  }
+  window.removeContextFile = removeContextFile;
+
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const fileName  = document.getElementById('file-name');
+  let selectedFile = null;
+  let currentJobId = null;
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('active'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('active');
+    selectedFile = e.dataTransfer.files[0];
+    fileName.textContent = selectedFile.name;
+    dropZone.classList.add('has-file');
+  });
+  fileInput.addEventListener('change', () => {
+    selectedFile = fileInput.files[0];
+    fileName.textContent = selectedFile ? selectedFile.name : '';
+    dropZone.classList.toggle('has-file', !!selectedFile);
+  });
+
+  async function startGeneration() {
+    const errEl = document.getElementById('error-msg');
+    errEl.style.display = 'none';
+
+    if (!selectedFile) {
+      errEl.textContent = 'Please select a document first.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    const btn = document.getElementById('generate-btn');
+    btn.disabled = true;
+    document.getElementById('upload-card').style.opacity = '.5';
+    document.getElementById('progress-card').style.display = 'block';
+
+    const form = new FormData();
+    form.append('file', selectedFile);
+    form.append('subject', document.getElementById('subject-input').value);
+    form.append('model', document.getElementById('model-select').value);
+    form.append('theme', document.getElementById('theme-select').value);
+    form.append('difficulty', document.getElementById('difficulty-select').value);
+    form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
+    const saved = getSavedKeys();
+    if (saved.openrouter) form.append('api_key', saved.openrouter);
+    if (saved.hf) form.append('hf_token', saved.hf);
+    if (saved.github) form.append('github_token', saved.github);
+    for (let i = 0; i < contextFiles.length; i++) form.append('context_files', contextFiles[i]);
+
+    let jobId;
+    try {
+      const res = await fetch('/api/generate', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+      jobId = data.job_id;
+      currentJobId = jobId;
+    } catch(e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      document.getElementById('upload-card').style.opacity = '1';
+      document.getElementById('progress-card').style.display = 'none';
+      return;
+    }
+
+    // Stream status via SSE
+    const startTime = Date.now();
+    const source = new EventSource(`/api/stream/${jobId}`);
+    source.onmessage = function(event) {
+      const d = JSON.parse(event.data);
+      const pct = d.progress || 0;
+      document.getElementById('progress-bar').style.width = pct + '%';
+
+      // Time estimate
+      let timeInfo = '';
+      if (pct > 5) {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const totalEst = elapsed / (pct / 100);
+        const remaining = Math.max(0, Math.round(totalEst - elapsed));
+        if (remaining > 60) {
+          timeInfo = ` (~${Math.round(remaining/60)}m remaining)`;
+        } else if (remaining > 0) {
+          timeInfo = ` (~${remaining}s remaining)`;
+        }
+      }
+      document.getElementById('status-text').textContent = (d.message || '') + timeInfo;
+
+      if (d.status === 'done') {
+        source.close();
+        showResults(jobId, d.files);
+      } else if (d.status === 'stopped') {
+        source.close();
+        document.getElementById('status-text').textContent = 'Generation stopped';
+        document.getElementById('status-text').classList.remove('running');
+        document.getElementById('pause-btn').style.display = 'none';
+        document.getElementById('stop-btn').style.display = 'none';
+        btn.disabled = false;
+        document.getElementById('upload-card').style.opacity = '1';
+        if (d.files && Object.keys(d.files).length) showResults(jobId, d.files);
+      } else if (d.status === 'error') {
+        source.close();
+        errEl.textContent = d.message;
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('upload-card').style.opacity = '1';
+      }
+    };
+    source.onerror = function() {
+      source.close();
+      errEl.textContent = 'Connection to server lost';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      document.getElementById('upload-card').style.opacity = '1';
+    };
+  }
+
+  function showResults(jobId, files) {
+    document.getElementById('progress-card').style.display = 'none';
+    document.getElementById('results-card').style.display = 'block';
+    currentJobId = null;
+    const links = document.getElementById('download-links');
+    links.innerHTML = '';
+    for (const [fmt, path] of Object.entries(files)) {
+      const cls = fmt === 'pdf' ? 'dl-pdf' : fmt === 'html' ? 'dl-html' : 'dl-btn';
+      links.innerHTML += `<a class="dl-btn ${cls}" href="/api/download/${jobId}/${fmt}" download>⬇ ${fmt.toUpperCase()}</a>`;
+    }
+  }
+
+  async function controlJob(action) {
+    if (!currentJobId) return;
+    const form = new FormData();
+    form.append('action', action);
+    await fetch(`/api/control/${currentJobId}`, { method: 'POST', body: form });
+    const pauseBtn = document.getElementById('pause-btn');
+    if (action === 'pause') {
+      pauseBtn.textContent = '▶ Resume';
+      pauseBtn.onclick = () => controlJob('resume');
+    } else if (action === 'resume') {
+      pauseBtn.textContent = '⏸ Pause';
+      pauseBtn.onclick = () => controlJob('pause');
+    } else if (action === 'stop') {
+      document.getElementById('status-text').textContent = 'Stopping...';
+    }
+  }
+
+  function resetUI() {
+    selectedFile = null;
+    fileName.textContent = '';
+    fileInput.value = '';
+    dropZone.classList.remove('has-file');
+    contextFiles = [];
+    renderContextFiles();
+    document.getElementById('subject-input').value = '';
+    document.getElementById('answers-check').checked = false;
+    document.getElementById('error-msg').style.display = 'none';
+    document.getElementById('generate-btn').disabled = false;
+    document.getElementById('upload-card').style.opacity = '1';
+    document.getElementById('results-card').style.display = 'none';
+    document.getElementById('progress-card').style.display = 'none';
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('error-msg').style.display = 'none';
+  }
+</script>
+</body>
+</html>

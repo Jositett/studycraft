@@ -7,9 +7,39 @@ for each chapter/subchapter.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import time
+from pathlib import Path
+
 from rich.console import Console
 
 console = Console()
+
+# Cache configuration
+_RESEARCH_CACHE = Path.home() / ".studycraft" / "research_cache.json"
+_CACHE_TTL = 3600 * 6  # 6 hours
+
+
+def _load_cache() -> dict:
+    if _RESEARCH_CACHE.exists():
+        try:
+            with open(_RESEARCH_CACHE, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_cache(key: str, result: str) -> None:
+    cache = _load_cache()
+    cache[key] = {"result": result, "ts": time.time()}
+    try:
+        _RESEARCH_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        with open(_RESEARCH_CACHE, "w", encoding="utf-8") as f:
+            json.dump(cache, f)
+    except Exception:
+        pass
 
 
 def research(
@@ -55,11 +85,18 @@ def _build_queries(
 
 def _search(query: str, max_results: int) -> str:
     console.print(f"  [dim]🔍 {query!r}[/dim]")
+    # Check cache
+    key = hashlib.md5(query.encode()).hexdigest()
+    cache = _load_cache()
+    if key in cache and time.time() - cache[key].get("ts", 0) < _CACHE_TTL:
+        return cache[key]["result"]
+
     try:
         from ddgs import DDGS
 
-        hits = DDGS().text(query, max_results=max_results)
+        hits = DDGS().text(query, max_results=max_results, timeout=8)
         if not hits:
+            _save_cache(key, "")
             return ""
         lines = []
         for h in hits:
@@ -67,7 +104,9 @@ def _search(query: str, max_results: int) -> str:
             body = h.get("body", "")
             href = h.get("href", "")
             lines.append(f"**{title}** ({href})\n{body}")
-        return "\n\n".join(lines)
+        result = "\n\n".join(lines)
+        _save_cache(key, result)
+        return result
     except Exception as exc:
         console.print(f"  [dim yellow]⚠ Search failed: {exc}[/dim yellow]")
         return ""

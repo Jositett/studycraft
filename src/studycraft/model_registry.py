@@ -16,8 +16,8 @@ from __future__ import annotations
 import json
 import os
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -45,9 +45,16 @@ def fetch_models(force: bool = False) -> list[dict[str, Any]]:
 
     console.print("[dim]Fetching models from OpenRouter...[/dim]")
     try:
-        req = urllib.request.Request(_API_URL, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            raw = json.loads(resp.read())
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(_API_URL, headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = json.loads(resp.read())
+                break
+            except (urllib.error.URLError, TimeoutError):
+                if attempt == 2:
+                    raise
+                time.sleep(2)
     except (urllib.error.URLError, TimeoutError) as exc:
         console.print(f"[yellow]Could not fetch models: {exc}[/yellow]")
         if _CACHE_FILE.exists():
@@ -78,9 +85,7 @@ def _normalize(raw_models: list[dict]) -> list[dict[str, Any]]:
         modality = arch.get("modality", "")
         input_modalities = arch.get("input_modalities", [])
         has_vision = (
-            "image" in input_modalities
-            or "image" in modality
-            or "vision" in model_id.lower()
+            "image" in input_modalities or "image" in modality or "vision" in model_id.lower()
         )
 
         out.append(

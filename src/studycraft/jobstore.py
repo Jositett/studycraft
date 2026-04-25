@@ -13,8 +13,10 @@ import sqlite3
 import time
 from pathlib import Path
 
-
 _EXPIRY_SECONDS = 86400  # 24 hours
+
+# Allowed column names for update() to prevent SQL injection via kwargs keys
+_ALLOWED_COLS = {"status", "progress", "message", "files", "control"}
 
 
 class JobStore:
@@ -36,9 +38,7 @@ class JobStore:
         self._conn.commit()
         # Migrate: add control column if missing (existing DBs)
         try:
-            self._conn.execute(
-                "ALTER TABLE jobs ADD COLUMN control TEXT NOT NULL DEFAULT ''"
-            )
+            self._conn.execute("ALTER TABLE jobs ADD COLUMN control TEXT NOT NULL DEFAULT ''")
             self._conn.commit()
         except sqlite3.OperationalError:
             pass
@@ -54,6 +54,10 @@ class JobStore:
     def update(self, job_id: str, **kwargs: object) -> None:
         if "files" in kwargs and isinstance(kwargs["files"], dict):
             kwargs["files"] = json.dumps(kwargs["files"])
+        # Validate allowed column names to prevent injection
+        invalid = set(kwargs.keys()) - _ALLOWED_COLS
+        if invalid:
+            raise ValueError(f"Unknown job fields: {invalid}")
         sets = ", ".join(f"{k} = ?" for k in kwargs)
         vals = list(kwargs.values()) + [job_id]
         self._conn.execute(f"UPDATE jobs SET {sets} WHERE id = ?", vals)  # noqa: S608
@@ -76,9 +80,7 @@ class JobStore:
 
     def get_control(self, job_id: str) -> str:
         """Get the control signal for a job (pause/stop/empty)."""
-        row = self._conn.execute(
-            "SELECT control FROM jobs WHERE id = ?", (job_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT control FROM jobs WHERE id = ?", (job_id,)).fetchone()
         return row[0] if row else ""
 
     def list_all(self) -> dict[str, dict]:

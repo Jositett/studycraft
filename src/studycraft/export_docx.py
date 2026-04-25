@@ -21,14 +21,12 @@ def _hex_to_rgb(h: str) -> tuple[int, int, int]:
     return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
 
 
-def export_docx(
-    full_markdown: str, output_path: Path, theme: "object | None" = None
-) -> Path:
+def export_docx(full_markdown: str, output_path: Path, theme: object | None = None) -> Path:
     """Export Markdown text to a styled DOCX file."""
     from docx import Document  # type: ignore
-    from docx.shared import Pt, Inches, RGBColor  # type: ignore
-    from docx.oxml.ns import qn  # type: ignore
     from docx.oxml import OxmlElement  # type: ignore
+    from docx.oxml.ns import qn  # type: ignore
+    from docx.shared import Inches, Pt, RGBColor  # type: ignore
 
     h1c = RGBColor(*_hex_to_rgb(theme.h1)) if theme else RGBColor(37, 99, 235)
     h2c = RGBColor(*_hex_to_rgb(theme.h2)) if theme else RGBColor(30, 58, 138)

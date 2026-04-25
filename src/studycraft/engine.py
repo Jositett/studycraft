@@ -16,22 +16,22 @@ from pathlib import Path
 from openai import OpenAI
 from rich.console import Console
 from rich.progress import (
+    BarColumn,
     Progress,
     SpinnerColumn,
-    TextColumn,
-    BarColumn,
     TaskProgressColumn,
+    TextColumn,
 )
 
+from .detector import Chapter, chapters_to_outline, detect_chapters
 from .loader import load_document
-from .detector import detect_chapters, chapters_to_outline, Chapter
 from .rag import RAGIndex
 from .researcher import research
 from .template import (
     CHAPTER_TEMPLATE,
     detect_subject_type,
-    example_format_hint,
     difficulty_hint,
+    example_format_hint,
 )
 from .validator import validate_chapter
 
@@ -62,6 +62,11 @@ class StudyCraft:
         output_dir: str | Path = "output",
         rag_dir: str | Path = "./rag_index",
         rate_limit_seconds: int = 5,
+        tts_engine: str | None = None,
+        tts_voice: str | None = None,
+        tts_speed: float = 1.0,
+        video_model: str | None = None,
+        video_resolution: str = "720p",
     ) -> None:
         self.client = OpenAI(base_url=base_url, api_key=api_key)
         self.api_key = api_key
@@ -74,6 +79,17 @@ class StudyCraft:
         self._model_failures: dict[str, int] = {}
         self._max_model_switches = 5
         self._switches_used = 0
+
+        # TTS support
+        self._tts_engine_name = tts_engine
+        self._tts_voice = tts_voice
+        self._tts_speed = tts_speed
+        self._audio_gen = None
+
+        # Video support
+        self._video_model = video_model
+        self._video_resolution = video_resolution
+        self._video_gen = None
 
     # -- Public API ------------------------------------------------------------
 
@@ -90,6 +106,13 @@ class StudyCraft:
         theme: str | None = None,
         on_check_control: ControlCallback = None,
         difficulty: str = "intermediate",
+        with_audio: bool = False,
+        tts_engine: str | None = None,
+        tts_voice: str | None = None,
+        tts_speed: float | None = None,
+        with_video: bool = False,
+        video_model: str | None = None,
+        video_resolution: str | None = None,
     ) -> dict[str, Path]:
         """
         Full pipeline: load -> detect -> index -> generate -> export.
@@ -101,6 +124,13 @@ class StudyCraft:
             only_chapter: Generate only this one chapter (by number).
             context_files: Extra documents to index into RAG (not generated).
             workers: Number of parallel workers for chapter generation.
+            with_audio: Generate audio guide using TTS.
+            tts_engine: TTS engine name (kitten, chatterbox, coqui, openrouter).
+            tts_voice: Voice name (engine-specific).
+            tts_speed: Playback speed multiplier.
+            with_video: Generate video guide using OpenRouter (free models only).
+            video_model: Video generation model ID (must be free).
+            video_resolution: Video resolution (720p or 1080p).
         """
         doc_path = Path(document_path)
 
@@ -115,11 +145,9 @@ class StudyCraft:
 
         # 3. Detect chapters
         console.print("[cyan]Detecting chapters...[/cyan]")
-        chapters = detect_chapters(raw_text)
+        chapters = detect_chapters(raw_text, llm_client=self.client)
         if not chapters:
-            raise ValueError(
-                "Could not detect any chapters. Check the document format."
-            )
+            raise ValueError("Could not detect any chapters. Check the document format.")
 
         console.print(f"\n[bold]Outline:[/bold]\n{chapters_to_outline(chapters)}\n")
 
@@ -134,9 +162,7 @@ class StudyCraft:
                 ctx_text = load_document(ctx_path)
                 self.rag.index(ctx_text, source_name=ctx_path.stem)
             except Exception as exc:
-                console.print(
-                    f"  [yellow]Skipping context file {ctx_path.name}: {exc}[/yellow]"
-                )
+                console.print(f"  [yellow]Skipping context file {ctx_path.name}: {exc}[/yellow]")
 
         # 5. Generate per chapter
         cache_dir = self.output_dir / ".cache"
@@ -176,9 +202,7 @@ class StudyCraft:
                     fixed = self._fix_placeholders(content, doc_subject)
                     if fixed:
                         generated[idx] = fixed
-                        console.print(
-                            f"  [green]Ch {idx + 1}: fixed placeholders[/green]"
-                        )
+                        console.print(f"  [green]Ch {idx + 1}: fixed placeholders[/green]")
 
             except Exception as exc:
                 console.print(f"  [yellow]Ch {idx + 1} review skipped: {exc}[/yellow]")
@@ -194,17 +218,106 @@ class StudyCraft:
             ak_path.write_text(answer_key, encoding="utf-8")
             console.print(f"[green]Answer Key[/green] -> {ak_path}")
 
+        # 7b. Audio generation (optional)
+        audio_paths = {}
+        if with_audio:
+            if on_progress:
+                on_progress(len(targets), len(targets), "Generating audio guide...")
+            console.print("[cyan]Generating audio guide...[/cyan]")
+
+            from .audio_generator import AudioGenerator
+
+            engine_name = tts_engine or self._tts_engine_name
+            voice = tts_voice or self._tts_voice
+            speed = tts_speed or self._tts_speed
+
+            audio_gen = AudioGenerator(
+                engine_name=engine_name,
+                voice=voice,
+                speed=speed,
+            )
+
+            # Prepare chapters for audio generation
+            audio_chapters = []
+            for idx, content in enumerate(generated):
+                if content and "<!-- Generation failed" not in content:
+                    audio_chapters.append(
+                        {
+                            "num": targets[idx]["num"],
+                            "title": targets[idx].get("title", f"Chapter {targets[idx]['num']}"),
+                            "content": content,
+                        }
+                    )
+
+            audio_dir = self.output_dir / "audio"
+            audio_paths = audio_gen.generate_all_chapters(
+                chapters=audio_chapters,
+                output_dir=audio_dir,
+                subject=doc_subject,
+                on_progress=on_progress,
+            )
+            console.print(f"[green]Audio guide:[/green] {len(audio_paths)} chapters -> {audio_dir}")
+
+        # 7c. Video generation (optional)
+        video_paths = {}
+        if with_video:
+            if on_progress:
+                on_progress(len(targets), len(targets), "Generating video guide...")
+            console.print("[cyan]Generating video guide...[/cyan]")
+
+            from .video_generator import VideoGenerator
+
+            v_model = video_model or self._video_model
+            v_resolution = video_resolution or self._video_resolution
+
+            video_gen = VideoGenerator(
+                api_key=self.api_key,
+                model=v_model,
+                output_dir=self.output_dir / "videos",
+            )
+
+            # Prepare chapters for video generation
+            video_chapters = []
+            for idx, content in enumerate(generated):
+                if content and "<!-- Generation failed" not in content:
+                    video_chapters.append(
+                        {
+                            "num": targets[idx]["num"],
+                            "title": targets[idx].get("title", f"Chapter {targets[idx]['num']}"),
+                            "content": content,
+                        }
+                    )
+
+            video_paths = video_gen.generate_all_chapters(
+                chapters=video_chapters,
+                output_dir=self.output_dir / "videos",
+                on_progress=on_progress,
+            )
+            console.print(
+                f"[green]Video guide:[/green] {len(video_paths)} chapters -> {self.output_dir / 'videos'}"
+            )
+
         # 8. Export
         combined = "\n\n---\n\n".join(generated)
         safe_name = re.sub(r"[^\w\s-]", "", doc_subject).strip().replace(" ", "_")
         from .export import export_all
 
-        return export_all(
+        result = export_all(
             combined,
             self.output_dir,
             base_name=f"{safe_name}_Practice_Guide",
             theme=theme,
         )
+
+        # Add audio paths to result
+        if audio_paths:
+            result["audio"] = audio_paths
+
+        # Add video paths to result
+        if video_paths:
+            result["video"] = video_paths
+
+        return result
 
     # -- Generation (sequential or parallel) -----------------------------------
 
@@ -226,9 +339,7 @@ class StudyCraft:
             cache_file = cache_dir / f"ch{ch_num.replace('.', '_')}.md"
             if int(ch_num.split(".")[0]) < resume_from and cache_file.exists():
                 return idx, cache_file.read_text(encoding="utf-8")
-            content = self._generate_chapter_with_retry(
-                ch, subject, difficulty=difficulty
-            )
+            content = self._generate_chapter_with_retry(ch, subject, difficulty=difficulty)
             cache_file.write_text(content, encoding="utf-8")
             return idx, content
 
@@ -246,9 +357,7 @@ class StudyCraft:
             if workers > 1 and len(targets) > 1:
                 console.print(f"[cyan]Parallel mode: {workers} workers[/cyan]")
                 with ThreadPoolExecutor(max_workers=workers) as pool:
-                    futures = [
-                        pool.submit(_gen_one, i, ch) for i, ch in enumerate(targets)
-                    ]
+                    futures = [pool.submit(_gen_one, i, ch) for i, ch in enumerate(targets)]
                     for future in futures:
                         idx, content = future.result()
                         generated[idx] = content
@@ -256,14 +365,20 @@ class StudyCraft:
                         if on_progress:
                             on_progress(idx + 1, len(targets), msg)
                         progress.advance(task)
+
+                        # Check for pause/stop (pause handled by blocking callback)
+                        if on_check_control:
+                            signal = on_check_control()
+                            if signal == "stop":
+                                pool.shutdown(wait=False, cancel_futures=True)
+                                console.print("[yellow]Generation stopped by user[/yellow]")
+                                break
             else:
                 for idx, ch in enumerate(targets):
                     msg = f"Generating chapter {idx + 1} of {len(targets)}: {ch['title'][:40]}"
                     if on_progress:
                         on_progress(idx, len(targets), msg)
-                    progress.update(
-                        task, description=f"Ch {ch['num']}: {ch['title'][:40]}..."
-                    )
+                    progress.update(task, description=f"Ch {ch['num']}: {ch['title'][:40]}...")
 
                     _, content = _gen_one(idx, ch)
                     generated[idx] = content
@@ -312,9 +427,7 @@ class StudyCraft:
             f"  [yellow]Ch {chapter['num']} failed validation ({result.summary()}) -- retrying...[/yellow]"
         )
         time.sleep(self.rate_limit_seconds)
-        content = self._generate_chapter(
-            chapter, subject, temperature=0.5, difficulty=difficulty
-        )
+        content = self._generate_chapter(chapter, subject, temperature=0.5, difficulty=difficulty)
         retry_result = validate_chapter(content, label=f"Ch {chapter['num']}")
         if not retry_result.passed:
             console.print(
@@ -322,42 +435,26 @@ class StudyCraft:
             )
         return content
 
-    def _generate_chapter(
+    def _build_prompt(
         self,
         chapter: Chapter,
         subject: str,
-        temperature: float = 0.3,
-        difficulty: str = "intermediate",
+        rag_ctx: str,
+        web_ctx: str,
+        subject_type: str,
+        format_hint: str,
+        diff_hint: str,
     ) -> str:
+        """Construct the LLM prompt for a chapter from its components."""
         sub_titles = [s["title"] for s in chapter["subchapters"]]
-        sub_label = (
-            "\n".join(f"  - {t}" for t in sub_titles) if sub_titles else "None detected"
-        )
-
-        # Context from RAG
-        rag_ctx = self.rag.query(f"{chapter['title']} {' '.join(sub_titles)}")
-
-        # Web research
-        web_ctx = research(
-            subject=subject,
-            chapter_title=chapter["title"],
-            subchapter_titles=sub_titles,
-        )
-
-        # Subject-type detection for format hints
-        subject_type = detect_subject_type(subject)
-        format_hint = example_format_hint(subject_type)
-        diff_hint = difficulty_hint(difficulty)
-
-        # Fill template
+        sub_label = "\n".join(f"  - {t}" for t in sub_titles) if sub_titles else "None detected"
         filled_template = (
             CHAPTER_TEMPLATE.replace("{chapter_num}", chapter["num"])
             .replace("{chapter_title}", chapter["title"])
             .replace("{subject}", subject)
             .replace("{subchapters}", sub_label)
         )
-
-        prompt = f"""You are an expert educator and technical writer.
+        return f"""You are an expert educator and technical writer.
 Generate a complete, high-quality practice guide chapter.
 Fill every placeholder with accurate, practical, subject-specific content.
 Do NOT add, remove, or rename any section. Do NOT output anything outside the template.
@@ -401,6 +498,34 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
 - Output ONLY the filled template, nothing else
 </rules>"""
 
+    def _generate_chapter(
+        self,
+        chapter: Chapter,
+        subject: str,
+        temperature: float = 0.3,
+        difficulty: str = "intermediate",
+    ) -> str:
+        sub_titles = [s["title"] for s in chapter["subchapters"]]
+
+        # Context from RAG
+        rag_ctx = self.rag.query(f"{chapter['title']} {' '.join(sub_titles)}")
+
+        # Web research
+        web_ctx = research(
+            subject=subject,
+            chapter_title=chapter["title"],
+            subchapter_titles=sub_titles,
+        )
+
+        # Subject-type detection for format hints
+        subject_type = detect_subject_type(subject)
+        format_hint = example_format_hint(subject_type)
+        diff_hint = difficulty_hint(difficulty)
+
+        prompt = self._build_prompt(
+            chapter, subject, rag_ctx, web_ctx, subject_type, format_hint, diff_hint
+        )
+
         try:
             resp = self._llm_call_with_backoff(prompt=prompt, temperature=temperature)
             content = resp.strip()
@@ -438,14 +563,10 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                 retryable = "429" in err or "500" in err or "502" in err or "503" in err
                 if retryable and attempt < max_attempts - 1:
                     wait = self.rate_limit_seconds * (2**attempt)
-                    console.print(
-                        f"  [yellow]Error {err[:60]}... waiting {wait}s[/yellow]"
-                    )
+                    console.print(f"  [yellow]Error {err[:60]}... waiting {wait}s[/yellow]")
                     time.sleep(wait)
                 elif "400" in err and attempt < max_attempts - 1:
-                    console.print(
-                        "  [yellow]400 error, truncating prompt and retrying...[/yellow]"
-                    )
+                    console.print("  [yellow]400 error, truncating prompt and retrying...[/yellow]")
                     prompt = prompt[: len(prompt) * 2 // 3]
                     time.sleep(self.rate_limit_seconds)
                 else:
@@ -518,6 +639,9 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
         if not sections:
             return f"# Answer Key -- {subject}\n\nNo quiz questions or exercises found."
 
+        # Limit total content to avoid token overflow: max 20 sections, each capped at ~1500 chars
+        capped_sections = [s[:1500] for s in sections[:20]]
+        combined = "\n\n".join(capped_sections)
         prompt = f"""You are an expert educator. Generate a complete answer key for the following quiz questions and practice exercises from a {subject} study guide.
 
 For each question/exercise:
@@ -525,7 +649,7 @@ For each question/exercise:
 - Provide the correct answer with a brief explanation
 
 QUESTIONS AND EXERCISES:
-{chr(10).join(sections[:6000])}
+{combined}
 
 Format as clean Markdown with clear numbering."""
 

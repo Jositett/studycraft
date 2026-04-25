@@ -36,7 +36,7 @@
 
 ### 2.3 Output management
 - [ ] Job history page — list all past generated guides
-- [ ] Store jobs in SQLite (replace in-memory `_jobs` dict)
+- [x] Store jobs in SQLite (replace in-memory `_jobs` dict)
 - [ ] Auto-cleanup of old job files after 24 hours
 
 ### 2.4 API
@@ -49,12 +49,12 @@
 ## Phase 3 — Generation Quality
 
 ### 3.1 Output validation
-- [ ] `validator.py` — check each generated chapter for:
+- [x] `validator.py` — check each generated chapter for:
   - All 8 section headings present
   - At least 3 worked examples
   - All 10 quiz questions populated
   - No unfilled `[...]` placeholders remaining
-- [ ] Auto-retry once on validation failure (different temperature)
+- [x] Auto-retry once on validation failure (different temperature)
 - [ ] `uv run studycraft validate output/guide.md` command
 
 ### 3.2 Smarter prompting
@@ -64,9 +64,9 @@
   and adjust example format (code vs equations vs prose vs vocabulary)
 
 ### 3.3 Answer key generation
-- [ ] After generating all chapters, make a second pass to produce an `Answer_Key.md`
+- [x] After generating all chapters, make a second pass to produce an `Answer_Key.md`
   with quiz answers, exercise solutions, and mini-project guidance
-- [ ] `--with-answers` flag on `generate`
+- [x] `--with-answers` flag on `generate`
 
 ---
 
@@ -97,7 +97,7 @@
 
 ### 5.2 Integrations
 - [ ] Notion API — push guide chapters as Notion pages
-- [ ] GitHub Gist — one-click publish the Markdown guide
+- [x] GitHub Gist — one-click publish the Markdown guide
 - [ ] Google Docs — export via Drive API
 
 ---
@@ -107,7 +107,7 @@
 ### 6.1 Parallel generation
 - [ ] `asyncio.gather` for concurrent chapter generation
 - [ ] Token budget manager — pause if rate limit approaches
-- [ ] `--workers N` flag
+- [x] `--workers N` flag
 
 ### 6.2 GitHub Actions
 - [ ] Workflow: regenerate guide when source document changes (git push trigger)

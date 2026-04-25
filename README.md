@@ -176,4 +176,34 @@ uv run python scripts/ci.py --build    # Build only
 uv run python scripts/release.py 0.9.0 # Release: CI + bump + tag + build
 ```
 
+### Dependency Management
+
+**Important:** This project uses `uv` for all dependency operations. Never use `pip` directly inside the virtual environment.
+
+- **Add a new dependency**: `uv add <package>`
+- **Update all dependencies**: `uv sync` (resolves and updates `uv.lock`)
+- **Reinstall without re-resolving** (safe when lockfile is trusted): `uv sync --frozen`
+- **Install optional PDF support**: `uv sync --extra pdf`
+
+If `uv sync` unexpectedly removes packages, it's because the lockfile is out of sync with `pyproject.toml`. Use `uv sync --frozen` to reinstall exactly what's locked, then run `uv add` to properly update dependencies.
+
+### Windows Setup
+
+Windows users should set UTF-8 encoding globally to avoid text corruption:
+
+```powershell
+# Set UTF-8 globally (add to your PowerShell profile)
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
+
+# Install dependencies (CPU-only, no CUDA)
+uv sync
+
+# If packages are missing after sync, reinstall from lockfile:
+uv sync --frozen
+
+# Install PDF export support (one-time, installs Chromium)
+uv run studycraft setup-pdf
+```
+
 See `PLAN.md` for the full development roadmap and `CHANGELOG.md` for version history.

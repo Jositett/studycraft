@@ -21,7 +21,7 @@ def export_epub(
     full_markdown: str,
     output_path: Path,
     title: str = "StudyCraft Guide",
-    theme: "object | None" = None,
+    theme: object | None = None,
 ) -> Path:
     """Export Markdown text to an EPUB file."""
     from ebooklib import epub  # type: ignore
@@ -63,8 +63,11 @@ def export_epub(
         file_name = f"ch{i:02d}.xhtml"
 
         html_body = md_lib.markdown(
-            ch_md, extensions=["tables", "fenced_code", "codehilite"],
-            extension_configs={"codehilite": {"css_class": "codehilite", "guess_lang": True, "noclasses": False}},
+            ch_md,
+            extensions=["tables", "fenced_code", "codehilite"],
+            extension_configs={
+                "codehilite": {"css_class": "codehilite", "guess_lang": True, "noclasses": False}
+            },
         )
         ch_item = epub.EpubHtml(title=first_line, file_name=file_name, lang="en")
         ch_item.content = f"<html><body>{html_body}</body></html>".encode()
