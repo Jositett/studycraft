@@ -8,10 +8,24 @@ app_port: 8000
 pinned: false
 hardware: cpu-basic
 suggested_hardware: cpu-upgrade
+tags:
+  - study-guides
+  - education
+  - audio
+  - video
+  - text-to-speech
+  - rag
 ---
 
 # StudyCraft
 
-Craft structured, research-backed practice guides from any document.
+AI-powered practice guide generator with **audio narration** and **video presentations**.
 
-Upload a PDF, DOCX, TXT, RTF, EPUB, or Markdown file — StudyCraft auto-detects every chapter, enriches each with live web research, and generates a complete study guide.
+Upload any document (PDF, DOCX, TXT, RTF, EPUB, MD) and get a complete study guide with:
+- 📚 Structured chapters, examples, quizzes, and projects
+- 🎵 Audio guide (TTS) with multiple engines (KittenTTS, Chatterbox, Coqui)
+- 🎬 Video guide (OpenRouter video models)
+- 📥 Export to MD, HTML, PDF, DOCX, EPUB with 9 themes
+- 🔍 RAG-powered context and live web research
+
+Built with OpenRouter, ChromaDB, and FastAPI. Self-hostable on HuggingFace Spaces.

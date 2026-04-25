@@ -18,8 +18,8 @@ COPY src/ src/
 
 # CPU-only PyTorch — skips ~2GB of NVIDIA CUDA packages
 ENV UV_TORCH_BACKEND=cpu
-# Install all deps including playwright (pdf optional extra)
-RUN uv sync --no-dev --extra pdf
+# Install all deps including all optional extras for full feature set
+RUN uv sync --no-dev --extra pdf --extra tts --extra video
 
 # Install Playwright Chromium for PDF export
 RUN uv run playwright install chromium

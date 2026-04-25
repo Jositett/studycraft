@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StudyCraft — Practice Guide Generator</title>
+<title>StudyCraft — AI Practice Guides with Audio & Video</title>
+<meta name="description" content="Generate study guides from any document. Features: AI-generated guides, audio narration (TTS), video presentations, multiple export formats (MD, HTML, PDF, DOCX, EPUB). Free OpenRouter models.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root {
@@ -248,10 +249,30 @@
     <label for="subject-input">Subject name (optional — auto-detected if blank)</label>
     <input type="text" id="subject-input" placeholder="e.g. Advanced Java, Calculus II, History of Art">
 
-    <label for="answers-check" class="checkbox-row">
-      <input type="checkbox" id="answers-check">
-      Generate answer key
-    </label>
+     <label for="answers-check" class="checkbox-row">
+       <input type="checkbox" id="answers-check">
+       Generate answer key
+     </label>
+
+     <label for="audio-check" class="checkbox-row">
+       <input type="checkbox" id="audio-check">
+       Generate audio guide (TTS)
+     </label>
+
+     <label for="video-check" class="checkbox-row">
+       <input type="checkbox" id="video-check">
+       Generate video guide (experimental)
+     </label>
+
+     <label for="audio-check" class="checkbox-row">
+       <input type="checkbox" id="audio-check">
+       Generate audio guide (TTS)
+     </label>
+
+     <label for="video-check" class="checkbox-row">
+       <input type="checkbox" id="video-check">
+       Generate video guide (experimental)
+     </label>
 
     <label>Additional context files (optional)</label>
     <div class="ctx-drop-zone" id="ctx-drop-zone">
@@ -373,18 +394,18 @@
 
    <hr>
    <h4>🎵 Audio Guide</h4>
-   <p>Generate a narrated version of your guide using Text-to-Speech. Multiple engines available:
+   <p>Check the "Generate audio guide" box to produce a narrated version using Text-to-Speech. Built-in engines:
      <ul>
-       <li><code>KittenTTS</code> — lightweight, CPU-only, 8 voices</li>
+       <li><code>KittenTTS</code> (default) — lightweight, CPU-only, 8 voices</li>
        <li><code>Chatterbox</code> — high quality, multilingual, MIT license</li>
        <li><code>Coqui/XTTS-v2</code> — 1100+ languages</li>
      </ul>
-     Install engines with optional deps: <code>uv sync --extra tts-kitten</code> or <code>uv sync --extra tts</code>
+     Install optional engines if needed: <code>uv sync --extra tts-kitten</code> or <code>uv sync --extra tts</code>.
    </p>
 
    <hr>
    <h4>🎬 Video Guide</h4>
-   <p>Create a video presentation with AI-generated visuals and narration. Uses OpenRouter video models (free tier available). Install: <code>uv sync --extra video</code></p>
+   <p>Check "Generate video guide" to create a video presentation with AI-generated visuals and narration. Uses OpenRouter video models (free tier available). Install: <code>uv sync --extra video</code>. Experimental — may take several minutes.</p>
 
    <hr>
    <h4>💡 Tips</h4>
@@ -562,11 +583,15 @@
 
     const form = new FormData();
     form.append('file', selectedFile);
-    form.append('subject', document.getElementById('subject-input').value);
-    form.append('model', document.getElementById('model-select').value);
-    form.append('theme', document.getElementById('theme-select').value);
-    form.append('difficulty', document.getElementById('difficulty-select').value);
-    form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
+     form.append('subject', document.getElementById('subject-input').value);
+     form.append('model', document.getElementById('model-select').value);
+     form.append('theme', document.getElementById('theme-select').value);
+     form.append('difficulty', document.getElementById('difficulty-select').value);
+     form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
+     form.append('with_audio', document.getElementById('audio-check').checked ? '1' : '');
+     form.append('with_video', document.getElementById('video-check').checked ? '1' : '');
+     form.append('with_audio', document.getElementById('audio-check').checked ? '1' : '');
+     form.append('with_video', document.getElementById('video-check').checked ? '1' : '');
     const saved = getSavedKeys();
     if (saved.openrouter) form.append('api_key', saved.openrouter);
     if (saved.hf) form.append('hf_token', saved.hf);

@@ -1,25 +1,29 @@
 # StudyCraft
 
-> **Craft structured, research-backed practice guides from any document.**
-> Upload a PDF, DOCX, TXT, RTF, EPUB, or Markdown file -- StudyCraft auto-detects every chapter and subchapter, enriches each with live web research, and generates a complete study guide exportable to Markdown, HTML, PDF, DOCX, and EPUB.
+> **AI-powered practice guides with audio narration and video presentations.**
+> Upload any document (PDF, DOCX, TXT, RTF, EPUB, MD) and get a complete study guide with RAG-powered context, live web research, and export to multiple formats. Optional audio (TTS) and video generation.
 
 ---
 
 ## Features
 
-- **Any subject, any document** -- not tied to any topic or file format
-- **Auto chapter + subchapter detection** -- numbered headings, Roman numerals, ALL-CAPS headers, or fixed-window fallback
-- **RAG grounding** -- indexes your document into a local vector store so the LLM stays on-topic
-- **Live web research** -- DuckDuckGo searches per chapter for current best practices and examples
-- **Output validation** -- checks sections, examples, quiz questions; auto-retries on failure
-- **Answer key generation** -- `--with-answers` produces a separate answer key
-- **Crash recovery** -- per-chapter cache; `--resume-from 5` skips chapters already generated
-- **Parallel generation** -- `--workers N` for concurrent chapter generation
-- **Nine export themes** -- `--theme dark|light|nord|solarized|dracula|github|monokai|ocean|rose-pine`
-- **Five export formats** -- `.md`, `.html`, `.pdf`, `.docx`, `.epub` with TOC navigation
-- **Live model registry** -- fetches models from OpenRouter API with free/vision filters
-- **CLI + Web UI** -- terminal or browser interface
-- **Docker ready** -- single command to self-host
+- **Any subject, any document** -- PDF, DOCX, TXT, RTF, EPUB, MD -- auto-detects chapters
+- **RAG grounding** -- ChromaDB vector store keeps LLM on-topic with your content
+- **Live web research** -- DuckDuckGo searches per chapter for current best practices
+- **Output validation** -- auto-retries if sections or quizzes are incomplete
+- **Answer key generation** -- `--with-answers` produces solutions for all exercises
+- **Crash recovery** -- per-chapter cache; resume with `--resume-from N`
+- **Parallel generation** -- `--workers N` for concurrent chapter creation
+- **Audio guides** -- `--with-audio` generates narrated versions using TTS engines:
+  - KittenTTS (lightweight, CPU-only, 8 voices)
+  - Chatterbox (high quality, multilingual, MIT)
+  - Coqui/XTTS-v2 (1100+ languages)
+- **Video guides** -- `--with-video` creates AI-generated presentations (OpenRouter models)
+- **Nine export themes** -- `dark`, `light`, `nord`, `solarized`, `dracula`, `github`, `monokai`, `ocean`, `rose-pine`
+- **Five export formats** -- `.md`, `.html`, `.pdf`, `.docx`, `.epub` with TOC
+- **Live model registry** -- fetches OpenRouter models with free/vision filters
+- **Web UI + CLI** -- FastAPI web interface and command-line tool
+- **Docker-ready** -- self-host with `docker-compose` or deploy to HuggingFace Spaces
 
 ---
 

@@ -49,19 +49,20 @@ All notable changes to StudyCraft will be documented in this file.
 ## [0.9.2] — 2026-04-25
 
 ### Added
-- Comprehensive Usage Guide in frontend documenting:
-  - Audio generation with KittenTTS, Chatterbox, Coqui/XTTS-v2
-  - Video generation with OpenRouter video models
-  - Theme selection, difficulty levels, and output formats
-  - Optional dependency installation commands
+- Frontend checkboxes for **Audio guide** (`--with-audio`) and **Video guide** (`--with-video`) generation
+- Usage Guide section updated with detailed information about:
+  - Audio TTS engines (KittenTTS, Chatterbox, Coqui/XTTS-v2) and optional dependencies
+  - Video generation with OpenRouter models and `--extra video` install
+  - Theme selection, difficulty levels, and output format options
+- `scripts/deploy.py` — cross-platform compatibility (uses `shutil.copy`)
 
 ### Changed
-- Frontend template updated with clearer feature explanations
-- Version bump to 0.9.2 across `pyproject.toml`, `__init__.py`, `web.py`
+- Updated `pyproject.toml` to reflect optional dependencies correctly
+- Frontend template (`templates/index.html`) improved UX for multimedia features
 
 ### Fixed
-- Cross-platform file operations in `scripts/deploy.py` (Windows compatibility)
-- HuggingFace CLI migration: `huggingface-cli` → `hf` in deploy script
+- HuggingFace deploy script uses modern `hf` CLI instead of deprecated `huggingface-cli`
+- Windows file operations in deploy script
 
 ---
 
