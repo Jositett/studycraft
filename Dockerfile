@@ -18,10 +18,15 @@ COPY src/ src/
 
 # CPU-only PyTorch — skips ~2GB of NVIDIA CUDA packages
 ENV UV_TORCH_BACKEND=cpu
-RUN uv sync --no-dev
+# Install all deps including playwright (pdf optional extra)
+RUN uv sync --no-dev --extra pdf
 
 # Install Playwright Chromium for PDF export
 RUN uv run playwright install chromium
+
+# HF Spaces runs as non-root — ensure runtime dirs are writable
+RUN mkdir -p /app/output /app/uploads /app/rag_index && \
+    chmod -R 777 /app/output /app/uploads /app/rag_index
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
