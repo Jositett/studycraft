@@ -26,6 +26,7 @@ Options:
 """
 
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -144,7 +145,7 @@ def cmd_hf_deploy(args: argparse.Namespace) -> None:
     print(f"{YELLOW}Swapping README.md for HF Spaces version...{RESET}")
     backup = MAIN_README.with_suffix(".md.backup")
     MAIN_README.rename(backup)
-    HF_README.copy(MAIN_README)
+    shutil.copy(HF_README, MAIN_README)
     run(["git", "add", "README.md"])
     run(["git", "commit", "-m", "chore: use HF Spaces README for deployment"], check=False)
 
