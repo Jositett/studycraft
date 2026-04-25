@@ -39,6 +39,9 @@ All notable changes to StudyCraft will be documented in this file.
 ### Development
 - All 96 tests pass
 - Ready for production use
+- Added `scripts/deploy.py` for HuggingFace Spaces & Docker Compose deployment
+- Dockerfile now installs `--extra pdf` to include Playwright; sets writable dirs for non-root
+- README.hf-spaces.md includes `hardware: cpu-basic` suggestion
 
 ---
 
