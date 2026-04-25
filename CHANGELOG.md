@@ -40,12 +40,32 @@ All notable changes to StudyCraft will be documented in this file.
 - All 96 tests pass
 - Ready for production use
 - Added `scripts/deploy.py` for HuggingFace Spaces & Docker Compose deployment
-- Dockerfile now installs `--extra pdf` to include Playwright; sets writable dirs for non-root
+- Dockerfile installs `--extra pdf` (Playwright) and sets writable dirs for UID 1000
 - README.hf-spaces.md includes `hardware: cpu-basic` suggestion
+- Updated frontend Usage Guide to document audio/video generation features
 
 ---
 
-## [0.9.0] — 2025-01-21
+## [0.9.2] — 2026-04-25
+
+### Added
+- Comprehensive Usage Guide in frontend documenting:
+  - Audio generation with KittenTTS, Chatterbox, Coqui/XTTS-v2
+  - Video generation with OpenRouter video models
+  - Theme selection, difficulty levels, and output formats
+  - Optional dependency installation commands
+
+### Changed
+- Frontend template updated with clearer feature explanations
+- Version bump to 0.9.2 across `pyproject.toml`, `__init__.py`, `web.py`
+
+### Fixed
+- Cross-platform file operations in `scripts/deploy.py` (Windows compatibility)
+- HuggingFace CLI migration: `huggingface-cli` → `hf` in deploy script
+
+---
+
+## [0.9.1] — 2026-04-25
 
 ### Added
 - Difficulty levels: `beginner`, `intermediate`, `advanced` — controls example complexity, quiz depth, and language

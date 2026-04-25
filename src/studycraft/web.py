@@ -89,7 +89,7 @@ def create_app() -> FastAPI:  # type: ignore
             "  uv add fastapi uvicorn jinja2 python-multipart"
         )
 
-    app = FastAPI(title="StudyCraft", version="0.9.1", lifespan=lifespan)
+    app = FastAPI(title="StudyCraft", version="0.9.2", lifespan=lifespan)
 
     @app.get("/favicon.svg")
     async def favicon():
