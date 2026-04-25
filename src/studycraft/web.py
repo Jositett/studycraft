@@ -38,6 +38,8 @@ try:
 except ImportError:
     _FASTAPI_AVAILABLE = False
 
+from jinja2 import Environment, PackageLoader, select_autoescape
+
 from .jobstore import JobStore
 
 UPLOAD_DIR = Path("uploads")
@@ -61,9 +63,10 @@ async def _check_auth(
 
 
 # ── Template setup via Jinja2 ──────────────────────────────────────────────────
-from jinja2 import Environment, PackageLoader
-
-_jinja_env = Environment(loader=PackageLoader("studycraft", "templates"))
+_jinja_env = Environment(
+    loader=PackageLoader("studycraft", "templates"),
+    autoescape=select_autoescape(["html", "htmxml"]),
+)
 
 
 def create_app() -> FastAPI:  # type: ignore
@@ -87,7 +90,10 @@ def create_app() -> FastAPI:  # type: ignore
 
     @app.get("/favicon.svg")
     async def favicon():
-        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">\U0001f4d6</text></svg>'
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+            '<text y=".9em" font-size="90">\U0001f4d6</text></svg>'
+        )
         return HTMLResponse(content=svg, media_type="image/svg+xml")
 
     @app.get("/", response_class=HTMLResponse)

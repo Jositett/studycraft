@@ -3,11 +3,11 @@
 import pytest
 
 from studycraft.template import (
-    detect_subject_type,
-    example_format_hint,
-    difficulty_hint,
-    DIFFICULTY_HINTS,
     CHAPTER_TEMPLATE,
+    DIFFICULTY_HINTS,
+    detect_subject_type,
+    difficulty_hint,
+    example_format_hint,
 )
 
 

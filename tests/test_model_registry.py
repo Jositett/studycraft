@@ -5,11 +5,10 @@ from unittest.mock import patch
 from studycraft.model_registry import (
     _normalize,
     get_free_models,
-    get_vision_models,
     get_model,
+    get_vision_models,
     search_models,
 )
-
 
 _SAMPLE_API_DATA = [
     {

@@ -2,9 +2,8 @@
 
 from pathlib import Path
 
-from studycraft.export import export_all, _extract_toc, _build_css, _build_epub_css
+from studycraft.export import _build_css, _build_epub_css, _extract_toc, export_all
 from studycraft.themes import DARK
-
 
 _SAMPLE_MD = """\
 # 📖 Practice Guide — Test Subject

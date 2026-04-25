@@ -2,8 +2,7 @@
 
 import pytest
 
-from studycraft.detector import detect_chapters, chapters_to_outline
-
+from studycraft.detector import chapters_to_outline, detect_chapters
 
 # ── Numbered heading detection ────────────────────────────────────────────────
 

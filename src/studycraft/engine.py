@@ -268,7 +268,6 @@ class StudyCraft:
             from .video_generator import VideoGenerator
 
             v_model = video_model or self._video_model
-            v_resolution = video_resolution or self._video_resolution
 
             video_gen = VideoGenerator(
                 api_key=self.api_key,
@@ -294,7 +293,8 @@ class StudyCraft:
                 on_progress=on_progress,
             )
             console.print(
-                f"[green]Video guide:[/green] {len(video_paths)} chapters -> {self.output_dir / 'videos'}"
+                f"[green]Video guide:[/green] {len(video_paths)} chapters -> "
+                f"{self.output_dir / 'videos'}"
             )
 
         # 8. Export
@@ -424,14 +424,15 @@ class StudyCraft:
             return content
 
         console.print(
-            f"  [yellow]Ch {chapter['num']} failed validation ({result.summary()}) -- retrying...[/yellow]"
+            f"  [yellow]Ch {chapter['num']} failed validation "
+            f"({result.summary()}) -- retrying...[/yellow]"
         )
         time.sleep(self.rate_limit_seconds)
         content = self._generate_chapter(chapter, subject, temperature=0.5, difficulty=difficulty)
         retry_result = validate_chapter(content, label=f"Ch {chapter['num']}")
         if not retry_result.passed:
             console.print(
-                f"  [yellow]Ch {chapter['num']} retry still has issues:[/yellow] {retry_result.summary()}"
+                f"  [yellow]Ch {chapter['num']} retry still has issues:[/yellow] {result.summary()}"
             )
         return content
 
@@ -642,16 +643,15 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
         # Limit total content to avoid token overflow: max 20 sections, each capped at ~1500 chars
         capped_sections = [s[:1500] for s in sections[:20]]
         combined = "\n\n".join(capped_sections)
-        prompt = f"""You are an expert educator. Generate a complete answer key for the following quiz questions and practice exercises from a {subject} study guide.
-
-For each question/exercise:
-- Restate the question number
-- Provide the correct answer with a brief explanation
-
-QUESTIONS AND EXERCISES:
-{combined}
-
-Format as clean Markdown with clear numbering."""
+        prompt = (
+            f"You are an expert educator. Generate a complete answer key for the following "
+            f"quiz questions and practice exercises from a {subject} study guide.\n\n"
+            f"For each question/exercise:\n"
+            f"- Restate the question number\n"
+            f"- Provide the correct answer with a brief explanation\n\n"
+            f"QUESTIONS AND EXERCISES:\n{combined}\n\n"
+            f"Format as clean Markdown with clear numbering."
+        )
 
         try:
             body = self._llm_call_with_backoff(prompt=prompt, temperature=0.2)

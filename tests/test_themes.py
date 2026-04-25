@@ -1,14 +1,13 @@
 """Tests for studycraft.themes."""
 
 from studycraft.themes import (
-    Theme,
-    THEMES,
+    DARK,
     DEFAULT_THEME,
+    THEMES,
+    Theme,
     get_theme,
     list_themes,
-    DARK,
 )
-
 
 _EXPECTED_THEMES = {"dark", "light", "nord", "solarized", "dracula", "github", "monokai", "ocean", "rose-pine"}
 

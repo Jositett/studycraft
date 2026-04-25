@@ -1,13 +1,12 @@
 """Tests for studycraft.validator."""
 
 from studycraft.validator import (
-    validate_chapter,
-    validate_guide,
-    REQUIRED_SECTIONS,
     MIN_EXAMPLES,
     MIN_QUIZ_QUESTIONS,
+    REQUIRED_SECTIONS,
+    validate_chapter,
+    validate_guide,
 )
-
 
 _GOOD_CHAPTER = """\
 # 📖 Practice Guide — Python

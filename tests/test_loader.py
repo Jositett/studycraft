@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from studycraft.loader import load_document, supported_extensions, SUPPORTED
+from studycraft.loader import SUPPORTED, load_document, supported_extensions
 
 
 @pytest.fixture

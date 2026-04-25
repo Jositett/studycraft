@@ -255,10 +255,10 @@ def _llm_toc_extraction(text: str, llm_client) -> list[Chapter] | None:
     """Use LLM to extract the table of contents from a text snippet.
     Returns a list of Chapter dicts (num, title, subchapters=[], text="") or None on failure."""
     prompt = (
-        "Extract the table of contents (chapter numbers and titles) from the following document excerpt. "
-        "Return ONLY a JSON array of objects, each with 'num' (string) and 'title' (string). "
-        'Do not include any other text. Example: [{"num": "1", "title": "Introduction"}, ...]\n\n'
-        + text
+        "Extract the table of contents (chapter numbers and titles) from the following "
+        "document excerpt. Return ONLY a JSON array of objects, each with 'num' (string) "
+        "and 'title' (string). Do not include any other text. "
+        'Example: [{"num": "1", "title": "Introduction"}, ...]\n\n' + text
     )
     try:
         resp = llm_client.chat.completions.create(
@@ -289,7 +289,7 @@ def _llm_toc_extraction(text: str, llm_client) -> list[Chapter] | None:
 
 def _attach_text(lines: list[str], result: tuple[list[Chapter], list[_Span]]) -> None:
     chapters, spans = result
-    for chapter, span in zip(chapters, spans):
+    for chapter, span in zip(chapters, spans, strict=True):
         chapter["text"] = "\n".join(lines[span.start_line : span.end_line + 1])
 
 
