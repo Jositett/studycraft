@@ -2,6 +2,46 @@
 
 All notable changes to StudyCraft will be documented in this file.
 
+## [0.9.1] — 2026-04-25
+
+### Added
+- SSE streaming endpoint `/api/stream/{job_id}` for real-time progress updates (replaces polling)
+- API key authentication via `STUDYCRAFT_WEB_TOKEN` for secure deployments
+- LLM-assisted TOC extraction fallback in `detector.py` (OpenRouter-powered chapter detection)
+- Per-query research cache in `~/.studycraft/research_cache.json` (6h TTL, saves ~30s per run)
+- Configurable 8s timeout per DuckDuckGo query
+- Comprehensive test coverage: `tests/test_engine.py` (mocked LLM), `tests/test_web.py` (FastAPI client)
+
+### Changed
+- `pyproject.toml`: Added `[tool.uv]` config (CPU-only torch, reinstall-package), moved `playwright` to `pdf` optional extra, added `pytest-asyncio` and `httpx` to dev deps
+- `JobStore` is now a module-level singleton with startup/shutdown lifecycle (prevents race conditions)
+- Parallel worker loop now respects `on_check_control` for pause/stop
+- RAG chunk IDs sanitized to valid characters (`re.sub(r"[^\w-]", "_", source_name)`)
+- EPUB loader separates block vs inline tags to preserve paragraph structure
+- Answer key generator caps sections before joining (avoids token overflow)
+- `JobStore.update()` validates column names against allowed set (SQL injection prevention)
+- Engine: extracted `_build_prompt()` method for testability
+- Web UI: moved 800+ lines of inline HTML to `templates/index.html` using Jinja2 with autoescape
+- Model registry: `fetch_models()` now retries 3× with 2s delay
+- Developer experience: full `ruff` config (line-length 100, target py312), auto-formatted codebase
+- Documentation: README now includes Windows setup and dependency management guidance; PLAN.md updated
+
+### Fixed
+- `uv sync` no longer unexpectedly removes packages (CPU-only torch override)
+- `openai` dependency corrected to `>=1.82.0` (v2 does not exist on PyPI)
+- Race condition in concurrent JobStore instantiation
+- Lost pause/stop control in parallel generation mode
+- Potential ChromaDB ID collisions from special characters in source filenames
+- EPUB word concatenation due to aggressive tag stripping
+- Answer key truncation bug (was slicing string instead of list)
+- JobStore SQL injection vector via kwargs keys
+
+### Development
+- All 96 tests pass
+- Ready for production use
+
+---
+
 ## [0.9.0] — 2025-01-21
 
 ### Added

@@ -76,7 +76,7 @@ def create_app() -> FastAPI:  # type: ignore
             "  uv add fastapi uvicorn jinja2 python-multipart"
         )
 
-    app = FastAPI(title="StudyCraft", version="0.9.0")
+     app = FastAPI(title="StudyCraft", version="0.9.1")
 
     @app.on_event("startup")
     async def _startup():
