@@ -243,7 +243,7 @@ from manim import *
 class ChapterScene(Scene):
     def construct(self):
         self.camera.background_color = "#0f1117"
-{textwrap.indent(scene_body, "        ")}
+{textwrap.indent(textwrap.dedent(scene_body), '        ')}
 """)
 
 

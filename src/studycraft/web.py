@@ -278,11 +278,28 @@ def create_app() -> FastAPI:  # type: ignore
 
     @app.get("/api/download/{job_id}/{fmt}")
     async def download(job_id: str, fmt: str):
+        import io
+        import zipfile
+
         job = _store.get(job_id)
         if not job or fmt not in job.get("files", {}):
             raise HTTPException(status_code=404, detail="File not found")
-        file_path = job["files"][fmt]
-        return FileResponse(file_path, filename=Path(file_path).name)
+        file_path = Path(job["files"][fmt])
+        # Directories (audio/video) are zipped on the fly
+        if file_path.is_dir():
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for f in sorted(file_path.iterdir()):
+                    if f.is_file():
+                        zf.write(f, f.name)
+            buf.seek(0)
+            zip_name = f"{job_id}_{fmt}.zip"
+            return StreamingResponse(
+                buf,
+                media_type="application/zip",
+                headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
+            )
+        return FileResponse(str(file_path), filename=file_path.name)
 
     @app.post("/api/control/{job_id}")
     async def control(job_id: str, action: str = Form(...)):
