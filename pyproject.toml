@@ -67,10 +67,26 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "S"]
-ignore = ["S101", "S603", "B008"]   # allow assert in tests, subprocess, Depends()
+ignore = [
+    "S101",  # assert in tests
+    "S603",  # subprocess with trusted input
+    "S607",  # partial executable path (ffmpeg, uv, playwright)
+    "S110",  # try/except/pass — intentional silent fallbacks
+    "S112",  # try/except/continue — intentional
+    "S310",  # urlopen — all URLs are https:// constants
+    "S324",  # md5 — used for cache keys only, not security
+    "S104",  # 0.0.0.0 — required for Docker/HF Spaces
+    "B904",  # raise in except — typer.Exit() pattern
+    "B008",  # Depends() calls
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S"]
+"src/studycraft/export.py" = ["E501"]
+"src/studycraft/template.py" = ["E501"]
+"src/studycraft/tts_engines.py" = ["E501"]
+"src/studycraft/jobstore.py" = ["E501"]
+"src/studycraft/engine.py" = ["E501"]
 
 [project.optional-dependencies]
 pdf = ["playwright>=1.50.0"]

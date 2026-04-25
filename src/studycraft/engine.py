@@ -551,7 +551,10 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
             )
 
     def _llm_call_with_backoff(
-        self, prompt: str, temperature: float = 0.3, max_attempts: int = 4,
+        self,
+        prompt: str,
+        temperature: float = 0.3,
+        max_attempts: int = 4,
         timeout: int = 90,
     ) -> str:
         """Call the LLM with exponential backoff and auto model switching."""
@@ -570,7 +573,7 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                 # Empty or malformed response is transient — retry with backoff before switching
                 if not content or not content.strip():
                     if attempt < max_attempts - 1:
-                        wait = self.rate_limit_seconds * (2 ** attempt)
+                        wait = self.rate_limit_seconds * (2**attempt)
                         console.print(f"  [yellow]Empty response, retrying in {wait}s...[/yellow]")
                         time.sleep(wait)
                         continue
@@ -587,8 +590,12 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                 if "401" in err:
                     raise
                 # JSON decode / malformed response — treat as transient, retry with backoff
-                is_json_err = "Expecting value" in err or "JSONDecodeError" in err or "json" in err.lower()
-                retryable = "429" in err or "500" in err or "502" in err or "503" in err or is_json_err
+                is_json_err = (
+                    "Expecting value" in err or "JSONDecodeError" in err or "json" in err.lower()
+                )
+                retryable = (
+                    "429" in err or "500" in err or "502" in err or "503" in err or is_json_err
+                )
                 if retryable and attempt < max_attempts - 1:
                     wait = self.rate_limit_seconds * (2**attempt)
                     console.print(f"  [yellow]Error {err[:60]}... waiting {wait}s[/yellow]")

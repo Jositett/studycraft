@@ -112,11 +112,11 @@ class ChatterboxTTSEngine(TTSEngine):
             return
         if not self._available:
             raise RuntimeError("Chatterbox TTS not installed. Install with: uv add chatterbox-tts")
+        import torch
         from chatterbox.mtl_tts import ChatterboxMultilingualTTS
         from chatterbox.tts import ChatterboxTTS
         from chatterbox.tts_turbo import ChatterboxTurboTTS
 
-        import torch
         device = self._device or ("cuda" if torch.cuda.is_available() else "cpu")
         if self._model_type == "turbo":
             self._tts = ChatterboxTurboTTS.from_pretrained(device=device)
