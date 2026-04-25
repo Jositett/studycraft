@@ -52,11 +52,11 @@ def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
 
 
 def _ensure_hf_cli() -> None:
-    """Check that huggingface-cli is available."""
+    """Check that hf CLI is available."""
     try:
-        run(["huggingface-cli", "--help"], check=False)
+        run(["hf", "--help"], check=False)
     except FileNotFoundError:
-        print(f"{RED}Error: huggingface-cli not found. Install with:{RESET}")
+        print(f"{RED}Error: hf CLI not found. Install with:{RESET}")
         print(f"  {DIM}pip install huggingface_hub{RESET}")
         sys.exit(1)
 
@@ -73,10 +73,10 @@ def cmd_hf_setup(args: argparse.Namespace) -> None:
     print(f"  SDK: docker")
     print(f"  Port: 8000")
 
-    # Use huggingface-cli to create the space
+    # Use hf CLI to create the space
     # The CLI will prompt for confirmation if the space already exists
     cmd = [
-        "huggingface-cli",
+        "hf",
         "repo",
         "create",
         space_name,
@@ -96,7 +96,7 @@ def cmd_hf_setup(args: argparse.Namespace) -> None:
 
     print(f"\nNext steps:")
     print(
-        f"  1. Set secrets: {DIM}huggingface-cli env --repo-id {repo_id} set OPENROUTER_API_KEY <your-key>{RESET}"
+        f"  1. Set secrets: {DIM}hf env --repo-id {repo_id} set OPENROUTER_API_KEY <your-key>{RESET}"
     )
     print(
         f"  2. Deploy:      {DIM}uv run python scripts/deploy.py --target huggingface --deploy{RESET}"
@@ -168,9 +168,7 @@ def cmd_hf_deploy(args: argparse.Namespace) -> None:
     print(f"\n{GREEN}✓ Deployment complete!{RESET}")
     print(f"  https://huggingface.co/spaces/{repo_id}")
     print(f"\nTo set secrets:")
-    print(
-        f"  {DIM}huggingface-cli env --repo-id {repo_id} set OPENROUTER_API_KEY <your-key>{RESET}"
-    )
+    print(f"  {DIM}hf env --repo-id {repo_id} set OPENROUTER_API_KEY <your-key>{RESET}")
 
 
 def cmd_hf_secret(args: argparse.Namespace) -> None:
@@ -188,7 +186,7 @@ def cmd_hf_secret(args: argparse.Namespace) -> None:
         secret_value = getpass.getpass(f"Enter value for {secret_name}: ")
 
     print(f"{YELLOW}Setting secret '{secret_name}' on {repo_id}...{RESET}")
-    run(["huggingface-cli", "env", "--repo-id", repo_id, "set", secret_name, secret_value])
+    run(["hf", "env", "--repo-id", repo_id, "set", secret_name, secret_value])
     print(f"{GREEN}✓ Secret set{RESET}")
 
 
@@ -236,6 +234,8 @@ Examples:
 
   # Deploy locally with docker-compose
   uv run python scripts/deploy.py --target local
+
+Note: Uses the 'hf' CLI (huggingface_hub). Install with: pip install huggingface_hub
         """,
     )
 
