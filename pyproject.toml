@@ -84,5 +84,7 @@ tts = [
     "coqui-tts>=0.25.0",
 ]
 video = [
+    "manim>=0.18.0",
+    "pillow>=10.0",
     "videopython>=0.24.0",
 ]
