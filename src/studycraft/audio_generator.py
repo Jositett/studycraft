@@ -69,9 +69,13 @@ class AudioGenerator:
 
         self._fallback_chain = get_fallback_chain() if use_fallback else []
 
-    def _get_engine(self, text: str, output_path: Path) -> TTSEngine | None:
-        """Get an available engine, trying fallback if needed."""
-        if self._primary_engine and self._primary_engine.is_available():
+    def _get_engine_excluding(self, tried: set) -> TTSEngine | None:
+        """Get an available engine, skipping any already tried."""
+        if (
+            self._primary_engine
+            and self._primary_engine.is_available()
+            and self._primary_engine.name not in tried
+        ):
             return self._primary_engine
 
         if not self._use_fallback:
@@ -79,16 +83,20 @@ class AudioGenerator:
 
         available = list_available_engines()
         for engine_name, kwargs in self._fallback_chain:
-            if engine_name in available:
-                try:
-                    engine = get_engine(engine_name, **kwargs)
-                    if engine.is_available():
-                        console.print(f"[dim]Using fallback engine: {engine.name}[/dim]")
-                        return engine
-                except Exception:
-                    continue
+            if engine_name not in available:
+                continue
+            try:
+                engine = get_engine(engine_name, **kwargs)
+                if engine.is_available() and engine.name not in tried:
+                    console.print(f"[dim]Using fallback engine: {engine.name}[/dim]")
+                    return engine
+            except Exception:
+                continue
 
         return None
+
+    def _get_engine(self, text: str, output_path: Path) -> TTSEngine | None:
+        return self._get_engine_excluding(set())
 
     def generate_chapter(
         self,
@@ -97,6 +105,7 @@ class AudioGenerator:
         voice: str | None = None,
         speed: float | None = None,
         chapter_num: str | None = None,
+        _tried: set | None = None,
         **kwargs,
     ) -> Path | None:
         """
@@ -116,7 +125,10 @@ class AudioGenerator:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        engine = self._get_engine(text, output_path)
+        tried: set = _tried or set()
+
+        # Pick an engine not yet tried this call
+        engine = self._get_engine_excluding(tried)
         if engine is None:
             console.print("[red]No TTS engine available[/red]")
             return None
@@ -136,12 +148,11 @@ class AudioGenerator:
             return result
         except Exception as exc:
             console.print(f"[red]Audio generation failed ({engine.name}): {exc}[/red]")
-
-            # Try next fallback engine
+            tried.add(engine.name)
             if self._use_fallback:
-                original_name = engine.name
-                self._primary_engine = None  # Force re-selection
-                return self.generate_chapter(text, output_path, voice, speed, chapter_num, **kwargs)
+                return self.generate_chapter(
+                    text, output_path, voice, speed, chapter_num, _tried=tried, **kwargs
+                )
             return None
 
     def generate_all_chapters(

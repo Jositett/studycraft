@@ -116,12 +116,14 @@ class ChatterboxTTSEngine(TTSEngine):
         from chatterbox.tts import ChatterboxTTS
         from chatterbox.tts_turbo import ChatterboxTurboTTS
 
+        import torch
+        device = self._device or ("cuda" if torch.cuda.is_available() else "cpu")
         if self._model_type == "turbo":
-            self._tts = ChatterboxTurboTTS(device=self._device)
+            self._tts = ChatterboxTurboTTS.from_pretrained(device=device)
         elif self._model_type == "multilingual":
-            self._tts = ChatterboxMultilingualTTS(device=self._device)
+            self._tts = ChatterboxMultilingualTTS.from_pretrained(device=device)
         else:
-            self._tts = ChatterboxTTS(device=self._device)
+            self._tts = ChatterboxTTS.from_pretrained(device=device)
 
     def synthesize(
         self,
