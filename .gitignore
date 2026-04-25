@@ -45,3 +45,6 @@ run.log
 # Misc
 *.bak
 *.tmp
+
+# Binary
+*.zip
