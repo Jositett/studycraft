@@ -45,4 +45,5 @@ VOLUME ["/app/output", "/app/uploads", "/app/rag_index"]
 ENV PORT=8000
 EXPOSE ${PORT}
 
+# rebuild trigger: faadedb
 CMD studycraft-web --port ${PORT}
