@@ -567,12 +567,16 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                     timeout=timeout,
                 )
                 content = resp.choices[0].message.content
-                # Empty response is transient — retry with backoff before switching
+                # Empty or malformed response is transient — retry with backoff before switching
                 if not content or not content.strip():
                     if attempt < max_attempts - 1:
                         wait = self.rate_limit_seconds * (2 ** attempt)
                         console.print(f"  [yellow]Empty response, retrying in {wait}s...[/yellow]")
                         time.sleep(wait)
+                        continue
+                    # Exhausted retries on empty — switch model and try once more
+                    switched = self._try_switch_model()
+                    if switched:
                         continue
                     raise ValueError("LLM returned empty response after retries")
                 return content.strip()
@@ -582,7 +586,9 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
                 # Never switch models on auth errors — surface them immediately
                 if "401" in err:
                     raise
-                retryable = "429" in err or "500" in err or "502" in err or "503" in err
+                # JSON decode / malformed response — treat as transient, retry with backoff
+                is_json_err = "Expecting value" in err or "JSONDecodeError" in err or "json" in err.lower()
+                retryable = "429" in err or "500" in err or "502" in err or "503" in err or is_json_err
                 if retryable and attempt < max_attempts - 1:
                     wait = self.rate_limit_seconds * (2**attempt)
                     console.print(f"  [yellow]Error {err[:60]}... waiting {wait}s[/yellow]")
