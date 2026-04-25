@@ -16,30 +16,32 @@ from pathlib import Path
 
 # ── Dependency guard ──────────────────────────────────────────────────────────
 try:
-from fastapi import (
-    BackgroundTasks,
-    Depends,
-    FastAPI,
-    File,
-    Form,
-    HTTPException,
-    Security,
-    UploadFile,
-)
-from fastapi.responses import (
-    FileResponse,
-    HTMLResponse,
-    JSONResponse,
-    StreamingResponse,
-)
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from contextlib import asynccontextmanager
+    from contextlib import asynccontextmanager
 
-_FASTAPI_AVAILABLE = True
+    from fastapi import (
+        BackgroundTasks,
+        Depends,
+        FastAPI,
+        File,
+        Form,
+        HTTPException,
+        Security,
+        UploadFile,
+    )
+    from fastapi.responses import (
+        FileResponse,
+        HTMLResponse,
+        JSONResponse,
+        StreamingResponse,
+    )
+    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+    _FASTAPI_AVAILABLE = True
 except ImportError:
     _FASTAPI_AVAILABLE = False
 
 from jinja2 import Environment, PackageLoader, select_autoescape
+
 from .jobstore import JobStore
 
 UPLOAD_DIR = Path("uploads")

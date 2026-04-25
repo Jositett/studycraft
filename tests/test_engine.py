@@ -60,8 +60,8 @@ def test_run_single_chapter(tmp_path: Path):
         # Run only chapter 1
         result = craft.run(doc, only_chapter=1, workers=1)
 
-    # Check result contains expected formats (export produces markdown + html + pdf/docx/epub attempts)
+    # Check result contains expected formats (export: md, html, pdf/docx/epub)
     assert isinstance(result, dict)
     # Markdown file should exist
     md_files = list(Path(craft.output_dir).glob("*.md"))
-    assert len(md_files) >= 1, "Markdown export missing"
+    assert len(md_files) >= 1, "Markdown export missing"  # noqa: PT011
