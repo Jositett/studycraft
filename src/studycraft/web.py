@@ -140,11 +140,15 @@ def create_app() -> FastAPI:  # type: ignore
                 status_code=400,
                 detail="OpenRouter API key is required. Add it in the API Keys section above.",
             )
-        # Set optional tokens for this request's environment
-        if hf_token:
-            os.environ["HF_TOKEN"] = hf_token
-        if github_token:
-            os.environ["GITHUB_TOKEN"] = github_token
+        # Resolve checkbox values safely — bool('0') and bool('false') would be True
+        _truthy = ("1", "true", "yes")
+        do_answers = with_answers.strip().lower() in _truthy
+        do_audio = with_audio.strip().lower() in _truthy
+        do_video = with_video.strip().lower() in _truthy
+
+        # Capture optional tokens for this job without polluting the global env
+        effective_hf = hf_token or os.getenv("HF_TOKEN", "")
+        effective_github = github_token or os.getenv("GITHUB_TOKEN", "")
 
         job_id = str(uuid.uuid4())[:8]
         suffix = Path(file.filename or "doc.pdf").suffix.lower()
@@ -170,9 +174,9 @@ def create_app() -> FastAPI:  # type: ignore
             subject or None,
             model,
             effective_key,
-            bool(with_answers),
-            bool(with_audio),
-            bool(with_video),
+            do_answers,
+            do_audio,
+            do_video,
             ctx_paths,
             _store,
             theme,
@@ -348,20 +352,39 @@ async def _run_job(
 
         # Check if stopped during generation
         if store.get_control(job_id) == "stop":
+            flat_stopped: dict[str, str] = {}
+            for fmt, path in paths.items():
+                if isinstance(path, dict):
+                    dirs = {str(p.parent) for p in path.values() if isinstance(p, Path)}
+                    if dirs:
+                        flat_stopped[fmt] = dirs.pop()
+                else:
+                    flat_stopped[fmt] = str(path)
             store.update(
                 job_id,
                 status="stopped",
                 message="Stopped by user",
-                files={fmt: str(path) for fmt, path in paths.items()},
+                files=flat_stopped,
             )
             return
+
+        # Flatten paths: audio/video are dicts of {ch_num: Path}, store as dir path
+        flat: dict[str, str] = {}
+        for fmt, path in paths.items():
+            if isinstance(path, dict):
+                # Store the parent directory for audio/video
+                dirs = {str(p.parent) for p in path.values() if isinstance(p, Path)}
+                if dirs:
+                    flat[fmt] = dirs.pop()
+            else:
+                flat[fmt] = str(path)
 
         store.update(
             job_id,
             status="done",
             progress=100,
             message="Guide ready!",
-            files={fmt: str(path) for fmt, path in paths.items()},
+            files=flat,
         )
     except Exception as exc:
         store.update(job_id, status="error", message=str(exc))

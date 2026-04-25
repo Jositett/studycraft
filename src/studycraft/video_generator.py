@@ -58,17 +58,24 @@ class VideoGenerator:
         self._output_dir = Path(output_dir)
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Check if the model is free; warn if it's a paid model
+        # Enforce free-only: auto-select first free model if configured model is paid
         try:
             model_info = get_model(self._model)
             if model_info and not model_info.get("is_free", False):
-                console.print(
-                    f"[yellow]⚠ Warning:[/yellow] Model '{self._model}' is not marked as free. "
-                    f"You may incur costs when using this video generation model. "
-                    f"Set STUDYCRAFT_VIDEO_MODEL to a free model to avoid charges."
-                )
+                free = get_free_models()
+                if free:
+                    self._model = free[0]["id"]
+                    console.print(
+                        f"[yellow]⚠ Paid model requested; switched to free model: {self._model}[/yellow]"
+                    )
+                else:
+                    raise ValueError(
+                        f"Model '{model}' is not free and no free video models are available."
+                    )
+        except ValueError:
+            raise
         except Exception:
-            pass  # Silently ignore if model lookup fails
+            pass
 
     def _check_free_model(self) -> bool:
         """Verify the configured model is free."""
@@ -158,8 +165,8 @@ class VideoGenerator:
 
             console.print(f"[dim]Job submitted: {job_id}[/dim]")
 
-            # Step 2: Poll for completion
-            video_url = self._poll_job(job_id)
+            # Step 2: Poll for completion using the API-provided polling_url if available
+            video_url = self._poll_job(job_id, polling_url=polling_url)
 
             if not video_url:
                 console.print("[red]Video generation failed or timed out[/red]")
@@ -178,19 +185,26 @@ class VideoGenerator:
             console.print(f"[red]Video generation error: {exc}[/red]")
             return None
 
-    def _poll_job(self, job_id: str) -> str | None:
+    def _poll_job(self, job_id: str, polling_url: str | None = None) -> str | None:
         """Poll job status until completion or timeout."""
         start_time = time.time()
 
         while time.time() - start_time < _TIMEOUT:
             try:
-                status_resp = self._make_request("GET", f"/{job_id}")
+                if polling_url:
+                    req = Request(
+                        polling_url,
+                        headers={"Authorization": f"Bearer {self._api_key}"},
+                    )
+                    with urlopen(req, timeout=30) as resp:
+                        status_resp = json.loads(resp.read())
+                else:
+                    status_resp = self._make_request("GET", f"/{job_id}")
                 status = status_resp.get("status", "unknown")
 
                 console.print(f"[dim]Status: {status}[/dim]")
 
                 if status == "completed":
-                    # Get download URL
                     unsigned_urls = status_resp.get("unsigned_urls", [])
                     if unsigned_urls:
                         return unsigned_urls[0]

@@ -546,6 +546,7 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
     ) -> str:
         """Call the LLM with exponential backoff and auto model switching."""
         last_exc = None
+        truncations = 0
         for attempt in range(max_attempts):
             try:
                 resp = self.client.chat.completions.create(
@@ -561,42 +562,51 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
             except Exception as exc:
                 last_exc = exc
                 err = str(exc)
+                # Never switch models on auth errors — surface them immediately
+                if "401" in err:
+                    raise
                 retryable = "429" in err or "500" in err or "502" in err or "503" in err
                 if retryable and attempt < max_attempts - 1:
                     wait = self.rate_limit_seconds * (2**attempt)
                     console.print(f"  [yellow]Error {err[:60]}... waiting {wait}s[/yellow]")
                     time.sleep(wait)
-                elif "400" in err and attempt < max_attempts - 1:
+                elif "400" in err and truncations < 2 and len(prompt) > 500:
                     console.print("  [yellow]400 error, truncating prompt and retrying...[/yellow]")
                     prompt = prompt[: len(prompt) * 2 // 3]
+                    truncations += 1
                     time.sleep(self.rate_limit_seconds)
                 else:
-                    # Try switching model
-                    switched = self._try_switch_model()
-                    if switched and attempt < max_attempts - 1:
-                        continue
+                    # Only switch model for model-specific errors (404, 503) or after exhausting retries
+                    if "404" in err or "503" in err or attempt == max_attempts - 1:
+                        switched = self._try_switch_model()
+                        if switched and attempt < max_attempts - 1:
+                            continue
                     raise
         raise last_exc  # type: ignore[misc]
 
     def _try_switch_model(self) -> bool:
-        """Attempt to switch to the next fallback model. Returns True if switched."""
+        """Attempt to switch to the next verified fallback model. Returns True if switched."""
         if self._switches_used >= self._max_model_switches:
             return False
 
-        # Lazy-load fallback chain
-        if not self._fallback_chain:
-            from .model_registry import get_fallback_chain
+        # Always re-fetch so we use the freshest health cache
+        from .model_registry import get_fallback_chain, test_model
 
-            self._fallback_chain = get_fallback_chain(self.api_key)
+        self._fallback_chain = get_fallback_chain(self.api_key)
 
         # Track failures for current model
         self._model_failures[self.model] = self._model_failures.get(self.model, 0) + 1
 
-        # Find next model not yet failed too many times
+        # Find next model not yet failed, and probe it before committing
         for candidate in self._fallback_chain:
             if candidate == self.model:
                 continue
             if self._model_failures.get(candidate, 0) >= 2:
+                continue
+            console.print(f"  [dim]Probing candidate model: {candidate}...[/dim]")
+            if not test_model(self.api_key, candidate):
+                console.print(f"  [yellow]Candidate {candidate} failed probe, skipping[/yellow]")
+                self._model_failures[candidate] = 2  # mark as bad
                 continue
             old = self.model
             self.model = candidate

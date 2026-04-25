@@ -128,8 +128,12 @@ def test_model(api_key: str, model_id: str, timeout: int = 15) -> bool:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read())
             return bool(data.get("choices"))
-    except Exception:
+    except urllib.error.HTTPError:
+        # Definitive model rejection (4xx/5xx from the API) — model is bad
         return False
+    except (urllib.error.URLError, TimeoutError, OSError):
+        # Network/DNS issue — don't penalise the model, treat as unknown
+        raise
 
 
 def get_verified_free_models(
@@ -160,11 +164,16 @@ def get_verified_free_models(
 
     console.print("[dim]Testing free models (1-token probe)...[/dim]")
     free = get_free_models()
-    # Test top 15 by context length to keep it fast
-    candidates = free[:15]
+    # Test top 30 by context length to keep it fast but cover more candidates
+    candidates = free[:30]
     healthy = []
     for m in candidates:
-        ok = test_model(api_key, m["id"])
+        try:
+            ok = test_model(api_key, m["id"])
+        except (urllib.error.URLError, TimeoutError, OSError):
+            # Network error during probing — skip this model without marking it failed
+            console.print(f"  [dim]{m['id']}: SKIP (network error)[/dim]")
+            continue
         status = "[green]OK[/green]" if ok else "[red]FAIL[/red]"
         console.print(f"  [dim]{m['id']}: {status}[/dim]")
         if ok:
