@@ -264,16 +264,6 @@
        Generate video guide (experimental)
      </label>
 
-     <label for="audio-check" class="checkbox-row">
-       <input type="checkbox" id="audio-check">
-       Generate audio guide (TTS)
-     </label>
-
-     <label for="video-check" class="checkbox-row">
-       <input type="checkbox" id="video-check">
-       Generate video guide (experimental)
-     </label>
-
     <label>Additional context files (optional)</label>
     <div class="ctx-drop-zone" id="ctx-drop-zone">
       <svg width="24" height="24" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24">
@@ -588,8 +578,6 @@
      form.append('theme', document.getElementById('theme-select').value);
      form.append('difficulty', document.getElementById('difficulty-select').value);
      form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
-     form.append('with_audio', document.getElementById('audio-check').checked ? '1' : '');
-     form.append('with_video', document.getElementById('video-check').checked ? '1' : '');
      form.append('with_audio', document.getElementById('audio-check').checked ? '1' : '');
      form.append('with_video', document.getElementById('video-check').checked ? '1' : '');
     const saved = getSavedKeys();
