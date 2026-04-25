@@ -163,6 +163,29 @@ docker run --rm --env-file .env -v $(pwd)/output:/app/output studycraft \
   studycraft generate /app/uploads/doc.pdf
 ```
 
+### HuggingFace Spaces
+
+Deploy StudyCraft as a public or private Space on HuggingFace:
+
+```bash
+# One-time: create the Space
+uv run python scripts/deploy.py --target huggingface --setup --org YOUR_USERNAME
+
+# Deploy code (updates the Space)
+uv run python scripts/deploy.py --target huggingface --deploy
+
+# Set your OpenRouter API key as a secret (required)
+uv run python scripts/deploy.py --target huggingface --secret
+```
+
+The deploy script:
+- Creates an `hf-deploy` branch with the correct `README.md` (YAML frontmatter)
+- Pushes to HuggingFace Spaces (Docker SDK)
+- Uses `cpu-basic` hardware by default (free tier)
+
+**Note:** The Dockerfile installs Playwright with `--extra pdf` to enable PDF export.
+Set `OPENROUTER_API_KEY` in Space secrets to enable LLM generation.
+
 ---
 
 ## Development

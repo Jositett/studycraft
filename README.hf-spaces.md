@@ -6,6 +6,8 @@ colorTo: purple
 sdk: docker
 app_port: 8000
 pinned: false
+hardware: cpu-basic
+suggested_hardware: cpu-upgrade
 ---
 
 # StudyCraft

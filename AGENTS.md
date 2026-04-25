@@ -110,7 +110,19 @@ uv run python scripts/ci.py --test       # Test only
 uv run python scripts/release.py 0.9.0   # CI + bump version + tag + build
 ```
 
-### Docker
+### Deployment
+```bash
+# HuggingFace Spaces
+uv run python scripts/deploy.py --target huggingface --setup      # Create Space (one-time)
+uv run python scripts/deploy.py --target huggingface --deploy    # Push code to Space
+uv run python scripts/deploy.py --target huggingface --secret    # Set OPENROUTER_API_KEY
+
+# Local Docker (docker-compose)
+uv run python scripts/deploy.py --target local                    # Build & run in background
+uv run python scripts/deploy.py --target local --stop            # Stop container
+```
+
+### Docker (manual)
 ```bash
 docker compose up -d                     # Self-host web UI
 docker run -p 8000:8000 --env-file .env studycraft  # Quick run
@@ -142,6 +154,7 @@ docker run -p 8000:8000 --env-file .env studycraft  # Quick run
 | Web UI | `src/studycraft/web.py` — FastAPI + inline HTML |
 | CI script | `scripts/ci.py` |
 | Release script | `scripts/release.py` |
+| Deploy script | `scripts/deploy.py` — HuggingFace Spaces & local Docker Compose deployment |
 | Env config | `.env` — git-ignored, set `OPENROUTER_API_KEY` or `STUDYCRAFT_API_KEY` |
 | Output directory | `output/` — generated guides, exports |
 | Audio output | `output/audio/` — generated audio files (MP3) |
