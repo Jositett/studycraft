@@ -290,6 +290,7 @@ class StudyCraft:
             video_paths = video_gen.generate_all_chapters(
                 chapters=video_chapters,
                 output_dir=self.output_dir / "videos",
+                audio_paths=audio_paths or {},
                 on_progress=on_progress,
             )
             console.print(

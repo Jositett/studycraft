@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Install uv
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv "setuptools<81"
 
 # Copy project files
 COPY pyproject.toml uv.lock .python-version README.md ./
@@ -19,7 +19,9 @@ COPY src/ src/
 # CPU-only PyTorch — skips ~2GB of NVIDIA CUDA packages
 ENV UV_TORCH_BACKEND=cpu
 # Install all deps including all optional extras for full feature set
-RUN uv sync --no-dev --extra pdf --extra tts --extra video
+# Pillow is needed for slideshow video fallback
+RUN uv sync --no-dev --extra pdf --extra tts --extra video && \
+    uv run pip install --no-cache-dir "Pillow>=10.0" "setuptools<81"
 
 # Install Playwright Chromium for PDF export
 RUN uv run playwright install chromium

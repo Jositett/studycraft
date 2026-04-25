@@ -68,9 +68,14 @@ class AudioGenerator:
                 self._primary_engine = None
 
         self._fallback_chain = get_fallback_chain() if use_fallback else []
+        self._resolved_engine: TTSEngine | None = None  # cached after first success
 
     def _get_engine_excluding(self, tried: set) -> TTSEngine | None:
         """Get an available engine, skipping any already tried."""
+        # Return cached engine if it worked before and hasn't been tried yet
+        if self._resolved_engine and self._resolved_engine.name not in tried:
+            return self._resolved_engine
+
         if (
             self._primary_engine
             and self._primary_engine.is_available()
@@ -144,6 +149,8 @@ class AudioGenerator:
                 speed=speed or self._speed,
                 **kwargs,
             )
+            # Cache the engine that worked so subsequent chapters skip re-probing
+            self._resolved_engine = engine
             console.print(f"[green]Audio saved:[/green] {result}")
             return result
         except Exception as exc:

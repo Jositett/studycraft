@@ -199,10 +199,9 @@ def _hex_to_rgb(h: str) -> tuple[int, int, int]:
 
 
 def _strip_emojis(text: str) -> str:
-    """Remove emoji characters that break PDF fonts."""
+    """Remove emoji and non-latin characters that break PDF fonts."""
     return re.sub(
-        r"[\U0001f300-\U0001f9ff\U00002702-\U000027b0\U0000fe00-\U0000fe0f"
-        r"\U0000200d\U00002600-\U000026ff\U00002700-\U000027bf]+",
+        r"[^\x00-\xFF]",  # remove anything outside latin-1 range
         "",
         text,
     ).strip()
@@ -220,6 +219,8 @@ def export_all(
     """Export to .md, .html, .pdf, .docx, .epub. Returns {format: Path}."""
     t = get_theme(theme)
     paths: dict[str, Path] = {}
+    # Strip emoji from base_name for PDF/DOCX compatibility
+    safe_base_name = _strip_emojis(base_name)
 
     # ── Markdown ──────────────────────────────────────────────────────────────
     toc_entries = _extract_toc(full_markdown)
@@ -230,7 +231,7 @@ def export_all(
     toc_md += "\n---\n\n"
     md_with_toc = toc_md + full_markdown
 
-    md_path = output_dir / f"{base_name}.md"
+    md_path = output_dir / f"{safe_base_name}.md"
     md_path.write_text(md_with_toc, encoding="utf-8")
     console.print(f"[green]✓ Markdown[/green] → {md_path}")
     paths["md"] = md_path
@@ -245,20 +246,20 @@ def export_all(
     html_body = md_ext.convert(full_markdown)
     toc_html = getattr(md_ext, "toc", "")
     html_doc = _wrap(html_body, base_name, t, toc_html)
-    html_path = output_dir / f"{base_name}.html"
+    html_path = output_dir / f"{safe_base_name}.html"
     html_path.write_text(html_doc, encoding="utf-8")
     console.print(f"[green]✓ HTML[/green]     → {html_path}")
     paths["html"] = html_path
 
     # ── PDF ───────────────────────────────────────────────────────────────────
-    pdf_path = output_dir / f"{base_name}.pdf"
+    pdf_path = output_dir / f"{safe_base_name}.pdf"
     try:
         _export_pdf_playwright(html_doc, pdf_path)
         console.print(f"[green]✓ PDF[/green]      → {pdf_path}")
         paths["pdf"] = pdf_path
     except Exception:
         try:
-            _export_pdf(full_markdown, pdf_path, base_name, t)
+            _export_pdf(full_markdown, pdf_path, safe_base_name, t)
             console.print(f"[green]✓ PDF[/green]      → {pdf_path} [dim](fpdf2 fallback)[/dim]")
             paths["pdf"] = pdf_path
         except Exception as exc:
@@ -271,7 +272,7 @@ def export_all(
     try:
         from .export_docx import export_docx
 
-        docx_path = output_dir / f"{base_name}.docx"
+        docx_path = output_dir / f"{safe_base_name}.docx"
         export_docx(full_markdown, docx_path, t)
         paths["docx"] = docx_path
     except Exception as exc:
@@ -281,8 +282,8 @@ def export_all(
     try:
         from .export_epub import export_epub
 
-        epub_path = output_dir / f"{base_name}.epub"
-        export_epub(full_markdown, epub_path, title=base_name.replace("_", " "), theme=t)
+        epub_path = output_dir / f"{safe_base_name}.epub"
+        export_epub(full_markdown, epub_path, title=safe_base_name.replace("_", " "), theme=t)
         paths["epub"] = epub_path
     except Exception as exc:
         console.print(f"[yellow]EPUB skipped:[/yellow] {exc}")
