@@ -47,9 +47,9 @@ def _detect_chapter_type(text: str) -> str:
     has_code = len(code_blocks) > 0
     has_math = bool(re.search(r"\$[^$]+\$|\\frac|\\sum|\\int", text))
     has_steps = len(_NUMBERED_RE.findall(text)) >= 3
-    has_flow = bool(re.search(
-        r"\b(flow|diagram|process|pipeline|architecture|sequence|step)\b", text, re.I
-    ))
+    has_flow = bool(
+        re.search(r"\b(flow|diagram|process|pipeline|architecture|sequence|step)\b", text, re.I)
+    )
 
     if has_code:
         return "code"
@@ -71,7 +71,7 @@ def _extract_code_sample(text: str) -> str:
     """Extract the first meaningful code block."""
     blocks = _CODE_RE.findall(text)
     for block in blocks:
-        lines = [l for l in block.strip().splitlines() if l.strip()]
+        lines = [line for line in block.strip().splitlines() if line.strip()]
         if lines:
             return "\n".join(lines[:12])
     return ""
@@ -100,9 +100,11 @@ def _extract_sections(text: str) -> list[tuple[str, list[str]]]:
 
 # ── Manim scene generation ────────────────────────────────────────────────────
 
+
 def _manim_available() -> bool:
     try:
         import manim  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -235,14 +237,14 @@ def _build_manim_scene(
         self.wait(1.5)
 '''
 
-    return textwrap.dedent(f'''\
+    return textwrap.dedent(f"""\
 from manim import *
 
 class ChapterScene(Scene):
     def construct(self):
         self.camera.background_color = "#0f1117"
 {textwrap.indent(scene_body, "        ")}
-''')
+""")
 
 
 def _render_manim_scene(scene_script: str, output_path: Path) -> Path | None:
@@ -254,11 +256,16 @@ def _render_manim_scene(scene_script: str, output_path: Path) -> Path | None:
 
         media_dir = tmp_path / "media"
         cmd = [
-            "python", "-m", "manim",
+            "python",
+            "-m",
+            "manim",
             "render",
-            "--quality", "m",          # 720p 30fps
-            "--output_file", "output",
-            "--media_dir", str(media_dir),
+            "--quality",
+            "m",  # 720p 30fps
+            "--output_file",
+            "output",
+            "--media_dir",
+            str(media_dir),
             "--disable_caching",
             str(scene_file),
             "ChapterScene",
@@ -279,13 +286,23 @@ def _render_manim_scene(scene_script: str, output_path: Path) -> Path | None:
         audio_path = output_path.with_suffix(".mp3")
         if audio_path.exists():
             muxed = tmp_path / "muxed.mp4"
-            mux = subprocess.run([
-                "ffmpeg", "-y",
-                "-i", str(rendered),
-                "-i", str(audio_path),
-                "-c:v", "copy", "-c:a", "aac", "-shortest",
-                str(muxed),
-            ], capture_output=True)
+            mux = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(rendered),
+                    "-i",
+                    str(audio_path),
+                    "-c:v",
+                    "copy",
+                    "-c:a",
+                    "aac",
+                    "-shortest",
+                    str(muxed),
+                ],
+                capture_output=True,
+            )
             if mux.returncode == 0:
                 rendered = muxed
 
@@ -295,6 +312,7 @@ def _render_manim_scene(scene_script: str, output_path: Path) -> Path | None:
 
 
 # ── Slideshow fallback ────────────────────────────────────────────────────────
+
 
 def _ffmpeg_available() -> bool:
     try:
@@ -314,13 +332,9 @@ def _render_slide(title: str, bullets: list[str], w: int, h: int):
         draw.line([(0, y), (w, y)], fill=(30, 50, 120))
 
     try:
-        title_font = ImageFont.truetype(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 42
-        )
-        body_font = ImageFont.truetype(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 28
-        )
-    except (OSError, IOError):
+        title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 42)
+        body_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 28)
+    except OSError:
         title_font = ImageFont.load_default()
         body_font = ImageFont.load_default()
 
@@ -369,28 +383,53 @@ def _generate_slideshow(
             slide_path = tmp_path / f"slide_{i:04d}.png"
             img.save(str(slide_path))
             lines.append(f"file '{slide_path}'\nduration {SLIDE_DURATION}\n")
-        lines.append(f"file '{tmp_path / f\"slide_{len(slides)-1:04d}.png\"}'")
+        last_slide = tmp_path / f"slide_{len(slides) - 1:04d}.png"
+        lines.append(f"file '{last_slide}'")
         frame_list.write_text("".join(lines))
 
         silent_path = tmp_path / "silent.mp4"
-        r = subprocess.run([
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-            "-i", str(frame_list),
-            "-vf", f"scale={W}:{H},fps={FPS}",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            str(silent_path),
-        ], capture_output=True)
+        r = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(frame_list),
+                "-vf",
+                f"scale={W}:{H},fps={FPS}",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                str(silent_path),
+            ],
+            capture_output=True,
+        )
         if r.returncode != 0:
             return None
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         if audio_path and audio_path.exists():
-            r2 = subprocess.run([
-                "ffmpeg", "-y",
-                "-i", str(silent_path), "-i", str(audio_path),
-                "-c:v", "copy", "-c:a", "aac", "-shortest",
-                str(output_path),
-            ], capture_output=True)
+            r2 = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(silent_path),
+                    "-i",
+                    str(audio_path),
+                    "-c:v",
+                    "copy",
+                    "-c:a",
+                    "aac",
+                    "-shortest",
+                    str(output_path),
+                ],
+                capture_output=True,
+            )
             if r2.returncode != 0:
                 output_path.write_bytes(silent_path.read_bytes())
         else:
@@ -401,6 +440,7 @@ def _generate_slideshow(
 
 
 # ── OpenRouter API ────────────────────────────────────────────────────────────
+
 
 class VideoGenerator:
     """
@@ -494,14 +534,18 @@ class VideoGenerator:
         label = f"Chapter {chapter_num}" if chapter_num else "Video"
         console.print(f"[cyan]Generating video (API): {label} ({self._model})[/cyan]")
         try:
-            resp = self._make_request("POST", "", {
-                "model": self._model,
-                "prompt": prompt[:500],
-                "duration": 5,
-                "resolution": "720p",
-                "aspect_ratio": "16:9",
-                "generate_audio": False,
-            })
+            resp = self._make_request(
+                "POST",
+                "",
+                {
+                    "model": self._model,
+                    "prompt": prompt[:500],
+                    "duration": 5,
+                    "resolution": "720p",
+                    "aspect_ratio": "16:9",
+                    "generate_audio": False,
+                },
+            )
             job_id = resp.get("id")
             if not job_id:
                 return None

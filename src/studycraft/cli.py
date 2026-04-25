@@ -16,15 +16,17 @@ import os
 import warnings
 from pathlib import Path
 
-# Silence pkg_resources deprecation from chatterbox-tts dependency (perth)
+# Silence deprecation warnings from chatterbox-tts dependencies (perth, diffusers)
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
 warnings.filterwarnings("ignore", message="Deprecated call to", category=UserWarning)
+warnings.filterwarnings("ignore", message="LoRACompatibleLinear", category=FutureWarning)
+warnings.filterwarnings("ignore", message="LoRACompatibleConv2d", category=FutureWarning)
 
-import typer
-from dotenv import load_dotenv
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
+import typer  # noqa: E402
+from dotenv import load_dotenv  # noqa: E402
+from rich.console import Console  # noqa: E402
+from rich.panel import Panel  # noqa: E402
+from rich.table import Table  # noqa: E402
 
 load_dotenv()
 
@@ -146,7 +148,7 @@ def generate(
         None,
         "--theme",
         "-t",
-        help="Export theme (dark, light, nord, solarized, dracula, github, monokai, ocean, rose-pine)",
+        help="Theme: dark|light|nord|solarized|dracula|github|monokai|ocean|rose-pine",
     ),
     difficulty: str = typer.Option(
         "intermediate",
@@ -319,7 +321,7 @@ def export(
         None,
         "--theme",
         "-t",
-        help="Export theme (dark, light, nord, solarized, dracula, github, monokai, ocean, rose-pine)",
+        help="Theme: dark|light|nord|solarized|dracula|github|monokai|ocean|rose-pine",
     ),
     difficulty: str = typer.Option(
         "intermediate",

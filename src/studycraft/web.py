@@ -15,9 +15,11 @@ import uuid
 import warnings
 from pathlib import Path
 
-# Silence pkg_resources deprecation from chatterbox-tts dependency (perth)
+# Silence deprecation warnings from chatterbox-tts dependencies (perth, diffusers)
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
 warnings.filterwarnings("ignore", message="Deprecated call to", category=UserWarning)
+warnings.filterwarnings("ignore", message="LoRACompatibleLinear", category=FutureWarning)
+warnings.filterwarnings("ignore", message="LoRACompatibleConv2d", category=FutureWarning)
 
 # ── Dependency guard ──────────────────────────────────────────────────────────
 try:
@@ -45,9 +47,9 @@ try:
 except ImportError:
     _FASTAPI_AVAILABLE = False
 
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import Environment, PackageLoader, select_autoescape  # noqa: E402
 
-from .jobstore import JobStore
+from .jobstore import JobStore  # noqa: E402
 
 UPLOAD_DIR = Path("uploads")
 OUTPUT_DIR = Path("output")
@@ -152,8 +154,7 @@ def create_app() -> FastAPI:  # type: ignore
         do_video = with_video.strip().lower() in _truthy
 
         # Capture optional tokens for this job without polluting the global env
-        effective_hf = hf_token or os.getenv("HF_TOKEN", "")
-        effective_github = github_token or os.getenv("GITHUB_TOKEN", "")
+        # (resolved at request time, not stored globally)
 
         job_id = str(uuid.uuid4())[:8]
         suffix = Path(file.filename or "doc.pdf").suffix.lower()
