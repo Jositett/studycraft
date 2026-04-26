@@ -60,7 +60,15 @@ def _detect_chapter_type(text: str) -> str:
     return "concepts"
 
 
+def _sanitize(text: str) -> str:
+    """Strip HTML tags, entities, and non-ASCII from text."""
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"&[a-zA-Z#0-9]+;", "", text)
+    return re.sub(r"[^\x20-\x7E]", "", text)
+
+
 def _extract_key_points(text: str, max_points: int = 6) -> list[str]:
+    text = _sanitize(text)
     bullets = _BULLET_RE.findall(text)
     numbered = _NUMBERED_RE.findall(text)
     points = (bullets + numbered)[:max_points]
@@ -79,6 +87,7 @@ def _extract_code_sample(text: str) -> str:
 
 def _extract_sections(text: str) -> list[tuple[str, list[str]]]:
     """Return [(section_title, [bullets])] from ## headings."""
+    text = _sanitize(text)
     parts = re.split(r"^##\s+", text, flags=re.MULTILINE)
     result = []
     for part in parts[1:]:
@@ -121,8 +130,11 @@ def _build_manim_scene(
     sections = _extract_sections(chapter_text)
     code_sample = _extract_code_sample(chapter_text)
 
-    # Escape strings for Python source
+    # Strip HTML tags/entities and escape for Python source
     def esc(s: str) -> str:
+        s = re.sub(r"<[^>]+>", "", s)          # strip HTML tags
+        s = re.sub(r"&[a-zA-Z#0-9]+;", "", s)  # strip HTML entities
+        s = re.sub(r"[^\x20-\x7E]", "", s)     # ASCII printable only
         return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
     title_esc = esc(safe_title)
