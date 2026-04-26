@@ -253,14 +253,19 @@ def export_all(
 
     # ── PDF ───────────────────────────────────────────────────────────────────
     pdf_path = output_dir / f"{safe_base_name}.pdf"
+    print_html = _build_print_html(full_markdown, safe_base_name, t)
     _pdf_ok = False
     for _attempt in [
-        lambda: _export_pdf_playwright(html_doc, pdf_path),
-        lambda: _export_pdf_xhtml2pdf(html_doc, pdf_path),
+        lambda: _export_pdf_playwright(print_html, pdf_path),
+        lambda: _export_pdf_xhtml2pdf(print_html, pdf_path),
         lambda: _export_pdf_fpdf2(full_markdown, pdf_path, safe_base_name, t),
     ]:
         try:
             _attempt()
+            try:
+                _inject_pdf_bookmarks(pdf_path, toc_entries)
+            except Exception:
+                pass  # bookmarks are best-effort
             console.print(f"[green]✓ PDF[/green]      → {pdf_path}")
             paths["pdf"] = pdf_path
             _pdf_ok = True
@@ -296,6 +301,181 @@ def export_all(
     return paths
 
 
+# ── PDF bookmark injection (shared) ──────────────────────────────────────────
+
+
+def _inject_pdf_bookmarks(pdf_path: Path, toc_entries: list[dict]) -> None:
+    """Add PDF outline/bookmarks to an existing PDF using pypdf."""
+    import pypdf
+    from pypdf.generic import NameObject
+
+    reader = pypdf.PdfReader(str(pdf_path))
+    writer = pypdf.PdfWriter()
+    writer.append(reader)
+
+    # Map heading slugs to page numbers by scanning page text
+    slug_to_page: dict[str, int] = {}
+    for page_num, page in enumerate(reader.pages):
+        text = page.extract_text() or ""
+        for entry in toc_entries:
+            if entry["title"] in text and entry["slug"] not in slug_to_page:
+                slug_to_page[entry["slug"]] = page_num
+
+    # Build outline — track parent handles per level
+    parents: dict[int, object] = {}
+    for entry in toc_entries:
+        level = entry["level"]
+        page_num = slug_to_page.get(entry["slug"], 0)
+        title = re.sub(r"[^\x20-\x7E]", "", entry["title"]).strip()  # ASCII only for PDF outline
+        parent = parents.get(level - 1)
+        handle = writer.add_outline_item(title, page_num, parent=parent)
+        parents[level] = handle
+        # Clear deeper levels when we go back up
+        for deeper in list(parents):
+            if deeper > level:
+                del parents[deeper]
+
+    # Set PDF viewer to show bookmarks panel on open
+    writer._root_object.update({NameObject("/PageMode"): NameObject("/UseOutlines")})
+
+    with pdf_path.open("wb") as f:
+        writer.write(f)
+
+
+# ── Print-optimized HTML for PDF renderers ────────────────────────────────────
+
+
+def _build_print_html(full_markdown: str, title: str, t: Theme) -> str:
+    """Build a print-optimized HTML document: no JS, no fixed sidebar,
+    rgba/gradient converted, inline TOC page, xhtml2pdf-safe CSS."""
+
+    def _rgba_to_hex(color: str) -> str:
+        """Convert rgba(r,g,b,a) to a blended hex against a dark/light bg."""
+        m = re.match(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color)
+        if not m:
+            return color
+        r, g, b, a = int(m[1]), int(m[2]), int(m[3]), float(m[4])
+        bg_r, bg_g, bg_b = _hex_to_rgb(t.bg)
+        br = int(r * a + bg_r * (1 - a))
+        bg2 = int(g * a + bg_g * (1 - a))
+        bb = int(b * a + bg_b * (1 - a))
+        return f"#{br:02x}{bg2:02x}{bb:02x}"
+
+    bg = t.bg
+    text = t.text
+    h1 = t.h1
+    h2 = t.h2
+    h3 = t.h3
+    primary = t.primary
+    muted = t.muted
+    border = t.border
+    code_bg = t.code_bg
+    code_fg = t.code_fg
+    code_inline_bg = _rgba_to_hex(t.code_inline_bg)
+    code_inline_fg = t.code_inline_fg
+    quote_border = t.quote_border
+    quote_bg = _rgba_to_hex(t.quote_bg)
+    quote_fg = t.quote_fg
+    th_bg = t.th_bg
+    th_fg = t.th_fg
+    td_border = t.td_border
+    td_alt_bg = _rgba_to_hex(t.td_alt_bg) if t.td_alt_bg.startswith("rgba") else t.td_alt_bg
+    cover_bg = _rgba_to_hex(t.cover_bg_start) if t.cover_bg_start.startswith("rgba") else t.cover_bg_start
+    cover_fg = t.cover_fg
+    syn_keyword = t.syn_keyword
+    syn_string = t.syn_string
+    syn_comment = t.syn_comment
+    syn_function = t.syn_function
+    syn_class = t.syn_class
+    syn_number = t.syn_number
+    syn_operator = t.syn_operator
+    syn_builtin = t.syn_builtin
+
+    css = f"""
+@page {{ size: A4; margin: 20mm 15mm; }}
+body {{ font-family: Helvetica, Arial, sans-serif; background: {bg}; color: {text}; font-size: 11pt; line-height: 1.6; }}
+.cover {{ background: {cover_bg}; color: {cover_fg}; padding: 40pt 30pt; text-align: center; margin-bottom: 30pt; }}
+.cover h1 {{ font-size: 24pt; font-weight: bold; color: {cover_fg}; border: none; margin: 0 0 8pt; }}
+.cover p {{ font-size: 11pt; color: {cover_fg}; margin: 0; }}
+.toc-page {{ page-break-after: always; margin-bottom: 20pt; }}
+.toc-page h2 {{ font-size: 16pt; color: {h1}; border-bottom: 2pt solid {h1}; padding-bottom: 4pt; margin-bottom: 12pt; }}
+.toc-page ul {{ list-style: none; padding: 0; margin: 0; }}
+.toc-page li {{ padding: 2pt 0; }}
+.toc-page li.level-1 {{ font-weight: bold; font-size: 10pt; color: {text}; }}
+.toc-page li.level-2 {{ padding-left: 16pt; font-size: 9pt; color: {h2}; }}
+.toc-page li.level-3 {{ padding-left: 32pt; font-size: 8pt; color: {muted}; }}
+.toc-page a {{ color: inherit; text-decoration: none; }}
+h1 {{ font-size: 18pt; font-weight: bold; color: {h1}; border-bottom: 2pt solid {h1}; padding-bottom: 3pt; margin: 20pt 0 8pt; page-break-before: always; }}
+h1:first-of-type {{ page-break-before: avoid; }}
+h2 {{ font-size: 14pt; font-weight: bold; color: {h2}; margin: 14pt 0 6pt; }}
+h3 {{ font-size: 12pt; font-weight: bold; color: {h3}; margin: 10pt 0 4pt; }}
+h4 {{ font-size: 11pt; font-weight: bold; margin: 8pt 0 3pt; }}
+p {{ margin: 0 0 8pt; }}
+ul, ol {{ padding-left: 18pt; margin: 0 0 8pt; }}
+li {{ margin-bottom: 3pt; }}
+strong {{ font-weight: bold; }}
+em {{ font-style: italic; }}
+a {{ color: {primary}; }}
+pre {{ background: {code_bg}; color: {code_fg}; padding: 10pt 12pt; font-size: 8pt; line-height: 1.4; border: 1pt solid {border}; margin: 8pt 0; overflow: hidden; }}
+code {{ font-family: Courier, monospace; background: {code_inline_bg}; color: {code_inline_fg}; font-size: 9pt; padding: 1pt 3pt; }}
+pre code {{ background: none; color: inherit; padding: 0; font-size: 8pt; }}
+blockquote {{ border-left: 3pt solid {quote_border}; background: {quote_bg}; padding: 6pt 10pt; color: {quote_fg}; font-style: italic; margin: 8pt 0; }}
+table {{ width: 100%; border-collapse: collapse; margin: 8pt 0; font-size: 9pt; }}
+th {{ background: {th_bg}; color: {th_fg}; padding: 5pt 8pt; text-align: left; font-weight: bold; }}
+td {{ padding: 4pt 8pt; border-bottom: 1pt solid {td_border}; }}
+tr.alt td {{ background: {td_alt_bg}; }}
+hr {{ border: none; border-top: 1pt solid {border}; margin: 12pt 0; }}
+.codehilite {{ background: {code_bg}; padding: 10pt 12pt; margin: 8pt 0; border: 1pt solid {border}; }}
+.codehilite pre {{ background: transparent; border: none; margin: 0; padding: 0; }}
+.codehilite .k, .codehilite .kn, .codehilite .kd, .codehilite .kc, .codehilite .kr, .codehilite .kt {{ color: {syn_keyword}; font-weight: bold; }}
+.codehilite .s, .codehilite .s1, .codehilite .s2 {{ color: {syn_string}; }}
+.codehilite .c, .codehilite .c1, .codehilite .cm {{ color: {syn_comment}; font-style: italic; }}
+.codehilite .nf, .codehilite .fm {{ color: {syn_function}; }}
+.codehilite .nc, .codehilite .nn {{ color: {syn_class}; }}
+.codehilite .mi, .codehilite .mf {{ color: {syn_number}; }}
+.codehilite .nb, .codehilite .bp {{ color: {syn_builtin}; }}
+.codehilite .o, .codehilite .ow {{ color: {syn_operator}; }}
+"""
+
+    # Convert markdown to HTML body
+    md_ext = md_lib.Markdown(
+        extensions=["tables", "fenced_code", "codehilite", "toc", "nl2br", "attr_list"],
+        extension_configs={
+            "codehilite": {"css_class": "codehilite", "guess_lang": True, "noclasses": False},
+        },
+    )
+    html_body = md_ext.convert(full_markdown)
+
+    # Inline TOC page
+    toc_entries = _extract_toc(full_markdown)
+    toc_items = ""
+    for e in toc_entries:
+        safe_title = re.sub(r"[^\x20-\x7E]", "", e["title"]).strip()
+        toc_items += f'<li class="level-{e["level"]}"><a href="#{e["slug"]}">{safe_title}</a></li>\n'
+
+    clean_title = re.sub(r"[^\x20-\x7E ]", "", title.replace("_", " ")).strip()
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{clean_title}</title>
+<style>{css}</style>
+</head>
+<body>
+<div class="cover">
+  <h1>{clean_title}</h1>
+  <p>Generated by StudyCraft</p>
+</div>
+<div class="toc-page">
+  <h2>Table of Contents</h2>
+  <ul>{toc_items}</ul>
+</div>
+{html_body}
+</body>
+</html>"""
+
+
 # ── PDF export (playwright) ────────────────────────────────────────────────────
 
 
@@ -307,7 +487,6 @@ def _export_pdf_playwright(html_content: str, pdf_path: Path) -> None:
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
-        # Hide the TOC sidebar for print
         page.evaluate("""
             const toc = document.querySelector('.toc-sidebar');
             if (toc) toc.style.display = 'none';
