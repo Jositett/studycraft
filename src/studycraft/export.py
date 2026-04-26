@@ -253,20 +253,25 @@ def export_all(
 
     # ── PDF ───────────────────────────────────────────────────────────────────
     pdf_path = output_dir / f"{safe_base_name}.pdf"
-    try:
-        _export_pdf_playwright(html_doc, pdf_path)
-        console.print(f"[green]✓ PDF[/green]      → {pdf_path}")
-        paths["pdf"] = pdf_path
-    except Exception:
+    _pdf_ok = False
+    for _attempt in [
+        lambda: _export_pdf_playwright(html_doc, pdf_path),
+        lambda: _export_pdf_xhtml2pdf(html_doc, pdf_path),
+        lambda: _export_pdf_fpdf2(full_markdown, pdf_path, safe_base_name, t),
+    ]:
         try:
-            _export_pdf(full_markdown, pdf_path, safe_base_name, t)
-            console.print(f"[green]✓ PDF[/green]      → {pdf_path} [dim](fpdf2 fallback)[/dim]")
+            _attempt()
+            console.print(f"[green]✓ PDF[/green]      → {pdf_path}")
             paths["pdf"] = pdf_path
-        except Exception as exc:
-            console.print(
-                f"[yellow]⚠ PDF skipped:[/yellow] {exc}\n"
-                "  Tip: open the HTML in Chrome → Ctrl+P → Save as PDF"
-            )
+            _pdf_ok = True
+            break
+        except Exception:
+            pass
+    if not _pdf_ok:
+        console.print(
+            "[yellow]⚠ PDF skipped[/yellow] — all renderers failed.\n"
+            "  Tip: open the HTML in Chrome → Ctrl+P → Save as PDF"
+        )
 
     # ── DOCX ──────────────────────────────────────────────────────────────────
     try:
@@ -318,10 +323,23 @@ def _export_pdf_playwright(html_content: str, pdf_path: Path) -> None:
         browser.close()
 
 
-# ── PDF export (fpdf2 fallback) ────────────────────────────────────────────────────────────────
+# ── PDF export (xhtml2pdf fallback) ─────────────────────────────────────────
 
 
-def _export_pdf(full_markdown: str, pdf_path: Path, base_name: str, t: Theme) -> None:
+def _export_pdf_xhtml2pdf(html_content: str, pdf_path: Path) -> None:
+    """Render HTML to PDF using xhtml2pdf (pure Python, full Unicode/emoji support)."""
+    from xhtml2pdf import pisa  # type: ignore
+
+    with pdf_path.open("wb") as f:
+        result = pisa.CreatePDF(html_content.encode("utf-8"), dest=f, encoding="utf-8")
+    if result.err:
+        raise RuntimeError(f"xhtml2pdf error: {result.err}")
+
+
+# ── PDF export (fpdf2 last-resort) ────────────────────────────────────────────
+
+
+def _export_pdf_fpdf2(full_markdown: str, pdf_path: Path, base_name: str, t: Theme) -> None:
     """Generate a styled PDF from Markdown using fpdf2."""
     import re as _re
 

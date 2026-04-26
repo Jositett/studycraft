@@ -62,9 +62,10 @@ def _detect_chapter_type(text: str) -> str:
 
 def _sanitize(text: str) -> str:
     """Strip HTML tags, entities, and non-ASCII from text."""
-    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"<[^>]+>", "", text, flags=re.DOTALL)   # multi-line tags
     text = re.sub(r"&[a-zA-Z#0-9]+;", "", text)
-    return re.sub(r"[^\x20-\x7E]", "", text)
+    text = re.sub(r"[^\x20-\x7E\n]", "", text)             # keep newlines
+    return text
 
 
 def _extract_key_points(text: str, max_points: int = 6) -> list[str]:
@@ -125,6 +126,7 @@ def _build_manim_scene(
     chapter_type: str,
 ) -> str:
     """Generate a Manim Python scene script for the chapter."""
+    chapter_text = _sanitize(chapter_text)
     safe_title = re.sub(r"[^\w\s]", "", chapter_title)[:50]
     key_points = _extract_key_points(chapter_text)
     sections = _extract_sections(chapter_text)
@@ -583,6 +585,7 @@ class VideoGenerator:
     ) -> Path | None:
         output_dir = Path(output_dir) if output_dir else self._output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
+        chapter_text = _sanitize(chapter_text)  # strip HTML before any processing
 
         safe = re.sub(r"[^\w\s-]", "", chapter_title).strip().replace(" ", "_")[:50]
         output_path = output_dir / f"ch{chapter_num.replace('.', '_')}_{safe}.mp4"
