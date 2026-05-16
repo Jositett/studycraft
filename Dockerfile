@@ -41,6 +41,13 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=utf-8
 
+# Accept HF_TOKEN and other secrets as build/runtime args
+ARG HF_TOKEN=""
+ENV HF_TOKEN=${HF_TOKEN}
+
+# OPENROUTER_API_KEY and STUDYCRAFT_WEB_TOKEN should be set at runtime via docker run -e
+# or in docker-compose.yml environment section
+
 VOLUME ["/app/output", "/app/uploads", "/app/rag_index"]
 ENV PORT=8000
 EXPOSE ${PORT}

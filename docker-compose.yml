@@ -7,12 +7,20 @@ services:
       - .env
     environment:
       - PYTHONIOENCODING=utf-8
+      # For faster HuggingFace model downloads, set HF_TOKEN in .env
+      # This reduces rate limiting for RAG embedding downloads
     volumes:
       - ./output:/app/output
       - ./uploads:/app/uploads
       - ./rag_index:/app/rag_index
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/')",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

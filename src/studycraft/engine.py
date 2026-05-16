@@ -464,10 +464,15 @@ class StudyCraft:
             .replace("{subject}", subject)
             .replace("{subchapters}", sub_label)
         )
-        return f"""You are an expert educator and technical writer.
-Generate a complete, high-quality practice guide chapter.
-Fill every placeholder with accurate, practical, subject-specific content.
-Do NOT add, remove, or rename any section. Do NOT output anything outside the template.
+        
+        # Count placeholders to track completion
+        placeholder_count = len(re.findall(r'\[(?:[A-Z][a-zA-Z\s\d]*\.{0,3}|\.{3})\]', filled_template))
+        
+        return f"""You are an expert educator and technical writer creating a complete, high-quality practice guide chapter.
+
+CRITICAL: Your output MUST fill EVERY placeholder with accurate, subject-specific content.
+This chapter contains {placeholder_count} placeholders (patterns like [Term 1], [Actionable objective 1], [...]).
+EVERY SINGLE placeholder must be replaced with real content before you finish.
 
 <subject>{subject}</subject>
 <subject_type>{subject_type}</subject_type>
@@ -476,15 +481,15 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
 <subchapters>{sub_label}</subchapters>
 
 <document_context>
-{chapter["text"][:3000]}
+{chapter["text"][:2500]}
 </document_context>
 
 <rag_context>
-{rag_ctx}
+{rag_ctx[:1500]}
 </rag_context>
 
 <web_research>
-{web_ctx}
+{web_ctx[:1500]}
 </web_research>
 
 <format_instructions>
@@ -495,18 +500,38 @@ Do NOT add, remove, or rename any section. Do NOT output anything outside the te
 {diff_hint}
 </difficulty>
 
+<required_sections>
+Your output MUST include all 8 sections:
+1. Learning Objectives (5 objectives)
+2. Core Concepts & Theory
+3. Worked Examples (minimum 3 examples, each with Problem → Solution → Explanation)
+4. Practice Exercises (Basic, Intermediate, Challenge levels)
+5. Mini Project (with requirements and extension)
+6. Chapter Quiz (exactly 10 questions)
+7. Reflection (5 reflection questions)
+8. Tips & Common Mistakes (3+ mistakes with explanations)
+
+Do NOT skip or combine any sections.
+</required_sections>
+
 <template>
 {filled_template}
 </template>
 
 <rules>
-- Use the exact subject "{subject}" throughout -- no generic placeholders
-- Examples must use the format described in format_instructions
-- All 10 quiz questions must be filled in with real questions
-- Keep examples practical and realistic, not toy/trivial examples
-- Do not reproduce the placeholder text -- replace it entirely
-- Output ONLY the filled template, nothing else
-</rules>"""
+1. REPLACE every bracket placeholder [like this] with real, practical content for the subject "{subject}"
+2. Do NOT output [Placeholder], [...], or any unfilled bracket content
+3. Keep all section headings and structure exactly as shown in template
+4. Examples must use the format: Problem → Solution (code/formula/approach) → Explanation
+5. All 10 quiz questions MUST be filled and diverse (recall, conceptual, application, synthesis)
+6. Do NOT add sections, remove sections, or rename section headings
+7. Do NOT add any text before the first "# 📖" or after the last section
+8. Output ONLY the filled template -- nothing else
+9. Use {subject} as the specific subject throughout, not generic content
+10. If you run out of tokens, you FAILED. Prioritize completeness of sections over length of content per section.
+</rules>
+
+Proceed to fill every placeholder and generate the complete chapter:"""
 
     def _generate_chapter(
         self,

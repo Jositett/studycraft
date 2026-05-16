@@ -63,20 +63,32 @@ class ValidationResult:
 
 
 def validate_chapter(text: str, label: str = "") -> ValidationResult:
-    """Validate a single generated chapter."""
+    """Validate a single generated chapter with flexible section matching."""
     result = ValidationResult(chapter_label=label)
 
-    # Check required sections
+    # Check required sections with flexible matching
+    # Allow variations like "Tips & Common Mistakes", "Common Mistakes & Best Practices", etc.
+    section_patterns = {
+        "Learning Objectives": r"(?i)learning\s+objectives?|objectives?\s+and\s+outcomes?",
+        "Core Concepts": r"(?i)core\s+concepts?|key\s+concepts?|concepts?\s+[&and]\s+theory|theory",
+        "Worked Examples": r"(?i)worked?\s+examples?|example|practical\s+examples?",
+        "Practice Exercises": r"(?i)practice\s+exercises?|exercises?|practice\s+problems?|problems?",
+        "Mini Project": r"(?i)mini\s+projects?|projects?|capstone|hands.?on",
+        "Chapter Quiz": r"(?i)chapters?\s+quizzes?|chapter\s+test|assessment|quiz",
+        "Reflection": r"(?i)reflections?|self.?assessment|reflection\s+questions?",
+        "Tips & Common Mistakes": r"(?i)tips?\s+[&and]\s+(?:common\s+)?mistakes?|common\s+mistakes?|gotchas?|pitfalls?|watch\s+out",
+    }
+    
     text_lower = text.lower()
-    for section in REQUIRED_SECTIONS:
-        if section.lower() not in text_lower:
-            result.missing_sections.append(section)
+    for section_name, pattern in section_patterns.items():
+        if not re.search(pattern, text_lower):
+            result.missing_sections.append(section_name)
 
     # Count worked examples (### Example N patterns)
-    result.example_count = len(re.findall(r"###\s+Example\s+\d", text))
+    result.example_count = len(re.findall(r"###\s+(?:example|worked\s+example|example)\s+\d", text, re.IGNORECASE))
 
     # Count quiz questions (numbered lines under quiz section)
-    quiz_match = re.split(r"(?i)##\s*\d*\.?\s*Chapter\s+Quiz", text)
+    quiz_match = re.split(r"(?i)##\s*\d*\.?\s*(?:chapter\s+)?quiz", text)
     if len(quiz_match) > 1:
         quiz_section = quiz_match[1].split("##")[0]  # up to next section
         result.quiz_count = len(re.findall(r"^\d{1,2}\.", quiz_section, re.MULTILINE))

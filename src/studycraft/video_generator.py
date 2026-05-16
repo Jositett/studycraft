@@ -61,11 +61,26 @@ def _detect_chapter_type(text: str) -> str:
 
 
 def _sanitize(text: str) -> str:
-    """Strip HTML tags, entities, and non-ASCII from text."""
-    text = re.sub(r"<[^>]+>", "", text, flags=re.DOTALL)   # multi-line tags
-    text = re.sub(r"&[a-zA-Z#0-9]+;", "", text)
-    text = re.sub(r"[^\x20-\x7E\n]", "", text)             # keep newlines
-    return text
+    """Strip HTML tags, entities, attributes, and non-ASCII from text.
+    
+    Handles:
+      - HTML tags: <div>, <span>, etc.
+      - HTML attributes: color="...", style="...", etc.
+      - HTML entities: &nbsp;, &#123;, etc.
+      - Non-printable ASCII characters
+    """
+    # Remove HTML/XML attributes and values (e.g., color="#CCC", style="...")
+    text = re.sub(r'\s*[a-z-]+\s*=\s*(["\']).*?\1', '', text, flags=re.IGNORECASE | re.DOTALL)
+    # Remove HTML/XML tags and their content
+    text = re.sub(r'<[^>]+>', '', text, flags=re.DOTALL)
+    # Remove HTML entities
+    text = re.sub(r'&(?:[a-zA-Z]+|#[0-9]+|#x[0-9a-fA-F]+);', '', text)
+    # Keep only printable ASCII + newlines
+    text = re.sub(r'[^\x20-\x7E\n]', '', text)
+    # Collapse multiple spaces/newlines
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r' {2,}', ' ', text)
+    return text.strip()
 
 
 def _extract_key_points(text: str, max_points: int = 6) -> list[str]:
@@ -548,20 +563,19 @@ class VideoGenerator:
         label = f"Chapter {chapter_num}" if chapter_num else "Video"
         console.print(f"[cyan]Generating video (API): {label} ({self._model})[/cyan]")
         try:
-            resp = self._make_request(
-                "POST",
-                "",
-                {
-                    "model": self._model,
-                    "prompt": prompt[:500],
-                    "duration": 5,
-                    "resolution": "720p",
-                    "aspect_ratio": "16:9",
-                    "generate_audio": False,
-                },
-            )
+            # OpenRouter video API uses simpler payload structure
+            # Only send required fields to avoid 400 Bad Request
+            payload = {
+                "model": self._model,
+                "prompt": prompt[:500],
+            }
+            # Optional fields for video quality (if supported by model)
+            # Note: Different video models have different parameter support
+            # Start minimal and add only proven fields
+            resp = self._make_request("POST", "", payload)
             job_id = resp.get("id")
             if not job_id:
+                console.print(f"[yellow]No job ID in response: {resp}[/yellow]")
                 return None
             video_url = self._poll_job(job_id, resp.get("polling_url"))
             if not video_url:
