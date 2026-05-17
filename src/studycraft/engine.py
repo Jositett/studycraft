@@ -585,6 +585,7 @@ Proceed to fill every placeholder and generate the complete chapter:"""
         """Call the LLM with exponential backoff and auto model switching."""
         last_exc = None
         truncations = 0
+        empty_count = 0
         for attempt in range(max_attempts):
             try:
                 resp = self.client.chat.completions.create(
@@ -595,25 +596,35 @@ Proceed to fill every placeholder and generate the complete chapter:"""
                     timeout=timeout,
                 )
                 content = resp.choices[0].message.content
-                # Empty or malformed response is transient — retry with backoff before switching
+                # Empty response — switch model after 1 retry (not 3)
                 if not content or not content.strip():
-                    if attempt < max_attempts - 1:
-                        wait = self.rate_limit_seconds * (2**attempt)
-                        console.print(f"  [yellow]Empty response, retrying in {wait}s...[/yellow]")
-                        time.sleep(wait)
-                        continue
-                    # Exhausted retries on empty — switch model and try once more
-                    switched = self._try_switch_model()
-                    if switched:
-                        continue
-                    raise ValueError("LLM returned empty response after retries")
+                    empty_count += 1
+                    if empty_count >= 2:
+                        # This model consistently returns empty — switch immediately
+                        console.print(f"  [yellow]Model {self.model} returns empty — switching[/yellow]")
+                        switched = self._try_switch_model()
+                        if switched:
+                            empty_count = 0
+                            continue
+                        raise ValueError("LLM returned empty response after retries")
+                    wait = self.rate_limit_seconds
+                    console.print(f"  [yellow]Empty response, retrying in {wait}s...[/yellow]")
+                    time.sleep(wait)
+                    continue
                 return content.strip()
-            except Exception as exc:
+            except BaseException as exc:
                 last_exc = exc
                 err = str(exc)
                 # Never switch models on auth errors — surface them immediately
                 if "401" in err:
                     raise
+                # Catch non-standard exceptions (e.g. "exceptions must derive from BaseException")
+                if "must derive from BaseException" in err or not isinstance(exc, Exception):
+                    console.print(f"  [yellow]Model {self.model} internal error — switching[/yellow]")
+                    switched = self._try_switch_model()
+                    if switched:
+                        continue
+                    raise RuntimeError(f"LLM internal error: {err}") from exc
                 # JSON decode / malformed response — treat as transient, retry with backoff
                 is_json_err = (
                     "Expecting value" in err or "JSONDecodeError" in err or "json" in err.lower()
@@ -631,7 +642,7 @@ Proceed to fill every placeholder and generate the complete chapter:"""
                     truncations += 1
                     time.sleep(self.rate_limit_seconds)
                 else:
-                    # Only switch model for model-specific errors (404, 503) or after exhausting retries
+                    # Switch model for model-specific errors or after exhausting retries
                     if "404" in err or "503" in err or attempt == max_attempts - 1:
                         switched = self._try_switch_model()
                         if switched and attempt < max_attempts - 1:
@@ -656,12 +667,16 @@ Proceed to fill every placeholder and generate the complete chapter:"""
         for candidate in self._fallback_chain:
             if candidate == self.model:
                 continue
-            if self._model_failures.get(candidate, 0) >= 2:
+            if self._model_failures.get(candidate, 0) >= 1:
                 continue
             console.print(f"  [dim]Probing candidate model: {candidate}...[/dim]")
-            if not test_model(self.api_key, candidate):
-                console.print(f"  [yellow]Candidate {candidate} failed probe, skipping[/yellow]")
-                self._model_failures[candidate] = 2  # mark as bad
+            try:
+                if not test_model(self.api_key, candidate):
+                    console.print(f"  [yellow]Candidate {candidate} failed probe, skipping[/yellow]")
+                    self._model_failures[candidate] = 2  # mark as bad
+                    continue
+            except Exception:
+                self._model_failures[candidate] = 2
                 continue
             old = self.model
             self.model = candidate
