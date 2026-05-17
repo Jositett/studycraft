@@ -8,13 +8,14 @@
 
 ## Executive Summary
 
-The StudyCraft deployment on HuggingFace Spaces is experiencing **3 critical issues**:
+The StudyCraft deployment on HuggingFace Spaces is experiencing **4 critical issues**:
 
 1. **Video Generation API Failures** — All chapters fail with HTTP 400 Bad Request
 2. **Manim Color Parsing Crashes** — Invalid HTML entities in color values
 3. **LLM Content Generation Defects** — Unfilled placeholders and missing sections in 50% of chapters
+4. **Audio Generation Silent Files** — TTS produces empty/silent MP3 files (0 ms audio)
 
-**Impact**: Users can download audio and PDF guides, but video generation and content quality are degraded.
+**Impact**: Users can download PDF guides, but audio/video generation produces unusable outputs.
 
 ---
 
@@ -275,15 +276,83 @@ Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF
 
 ---
 
+## Issue #4: Audio Generation Silent Files
+
+### Symptom
+
+```
+Generating audio: Chapter 1 (Chatterbox-TTS (turbo))
+Audio saved: output/e471ae7c/audio/ch1_The_Java_SE_8_Stream_Library.mp3
+[File created but contains no audio — 0 ms duration]
+```
+
+### Investigation
+
+**Step 1: Audio Generation Flow**
+
+From `engine.py`, lines 220-250:
+
+1. Full Markdown chapter content is prepared in `audio_chapters`
+2. Each chapter dict has `"content": <full_markdown>`
+3. Content includes headers, bullet points, code blocks, templates, etc.
+4. Audio generator passes this directly to TTS engine: `self._tts.generate(text)`
+
+**Step 2: Problem Identified**
+
+The Markdown content passed to TTS contains:
+
+- Multiple heading levels (`#`, `##`, `###`)
+- Bullet points and numbered lists
+- Code blocks with syntax highlighting markers
+- Template placeholders like `[...]`, `[Term 1]`
+- Table markdown formatting (`|---|---|`)
+
+When Chatterbox TTS processes this raw Markdown:
+
+1. It may fail to parse the structure correctly
+2. It may generate very short/empty audio
+3. **No error is raised** — the function succeeds but produces silent output
+
+**Step 3: Validation Gap**
+
+In `tts_engines.py`, `ChatterboxTTSEngine.synthesize()`, lines 130-144:
+
+```python
+def synthesize(self, text: str, output_path: str | Path, ...) -> Path:
+    self._lazy_load()
+    wav = self._tts.generate(text)
+    ta.save(str(output_path), wav, self._tts.sr)
+    return output_path  # Returns regardless of wav content
+```
+
+There's **NO validation** that:
+
+- Input text is non-empty
+- Output wav has any audio content
+- Generated file has minimum duration
+
+**Step 4: Root Cause Confirmed**
+
+**Markdown-formatted text passed directly to TTS without extraction of plain content.** TTS engines expect clean text, not Markdown. Additionally, **no validation of output audio file** to ensure it's not empty/silent.
+
+### Root Cause
+
+1. **No Markdown-to-plain-text extraction** — TTS receives raw Markdown formatting
+2. **Silent failure** — TTS generates empty audio without raising an error
+3. **No output validation** — Files saved even if they contain 0 ms of audio
+
+---
+
 ## Summary Table
 
-| Issue                 | Severity     | Root Cause                      | Fix Complexity |
-| --------------------- | ------------ | ------------------------------- | -------------- |
-| Video API 400 errors  | **CRITICAL** | Invalid request payload fields  | **MEDIUM**     |
-| Manim color parsing   | **HIGH**     | Incomplete HTML sanitization    | **LOW**        |
-| Unfilled placeholders | **HIGH**     | Weak prompt + token limits      | **MEDIUM**     |
-| Missing sections      | **MEDIUM**   | Fragile section detection regex | **LOW**        |
-| HF Hub auth warning   | **LOW**      | Missing HF_TOKEN env var        | **TRIVIAL**    |
+| Issue                 | Severity     | Root Cause                                   | Fix Complexity |
+| --------------------- | ------------ | -------------------------------------------- | -------------- |
+| Video API 400 errors  | **CRITICAL** | Invalid request payload fields               | **MEDIUM**     |
+| Audio silent files    | **CRITICAL** | Markdown not extracted, no output validation | **MEDIUM**     |
+| Manim color parsing   | **HIGH**     | Incomplete HTML sanitization                 | **LOW**        |
+| Unfilled placeholders | **HIGH**     | Weak prompt + token limits                   | **MEDIUM**     |
+| Missing sections      | **MEDIUM**   | Fragile section detection regex              | **LOW**        |
+| HF Hub auth warning   | **LOW**      | Missing HF_TOKEN env var                     | **TRIVIAL**    |
 
 ---
 
@@ -446,7 +515,60 @@ for section_name, pattern in section_patterns.items():
 
 ---
 
-### Fix #5: HuggingFace Token Support
+### Fix #5: Audio Markdown Stripping & Output Validation
+
+**File**: `src/studycraft/audio_generator.py`  
+**Status**: ✅ **COMPLETE**
+
+**Changes**:
+
+1. Added `_strip_markdown()` function that converts Markdown to clean plain text before TTS synthesis
+2. Added post-synthesis validation: files < 100 bytes are treated as silent/failed and trigger fallback
+3. Added early-exit when stripped text is empty (no speakable content)
+
+**Markdown stripping removes**:
+- Code blocks (``` ... ```)
+- Inline code (`code`)
+- Images and links (keeps link text)
+- HTML tags
+- Heading markers (#, ##, ###)
+- Bold/italic/strikethrough markers
+- Blockquotes, horizontal rules
+- List markers (-, *, +, 1.)
+
+**Before**:
+```python
+result = engine.synthesize(
+    text=text,  # Raw Markdown passed directly
+    output_path=output_path,
+    ...
+)
+return result  # No validation of output
+```
+
+**After**:
+```python
+plain_text = _strip_markdown(text)
+if not plain_text:
+    return None  # No speakable content
+
+result = engine.synthesize(
+    text=plain_text,  # Clean plain text
+    output_path=output_path,
+    ...
+)
+# Validate output is non-empty
+if result and result.exists() and result.stat().st_size < 100:
+    # Trigger fallback — file is likely silent
+    ...
+return result
+```
+
+**Expected Result**: TTS engines receive clean text, producing actual audio content. Silent files are detected and trigger engine fallback.
+
+---
+
+### Fix #6: HuggingFace Token Support
 
 **Files**: `Dockerfile`, `docker-compose.yml`, `.env.example`  
 **Status**: ✅ **COMPLETE**

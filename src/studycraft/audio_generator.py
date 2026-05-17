@@ -7,6 +7,7 @@ Supports dependency injection for engine selection and automatic fallback.
 
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 
@@ -20,6 +21,36 @@ from .tts_engines import (
 )
 
 console = Console()
+
+
+def _strip_markdown(text: str) -> str:
+    """Convert Markdown to plain text suitable for TTS synthesis."""
+    # Remove code blocks
+    text = re.sub(r"```[\s\S]*?```", "", text)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    # Remove images
+    text = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    # Convert links to just text
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    # Remove HTML tags
+    text = re.sub(r"<[^>]+>", "", text)
+    # Remove headings markers but keep text
+    text = re.sub(r"^#{1,6}\s*", "", text, flags=re.MULTILINE)
+    # Remove bold/italic markers
+    text = re.sub(r"\*{1,3}([^*]+)\*{1,3}", r"\1", text)
+    text = re.sub(r"_{1,3}([^_]+)_{1,3}", r"\1", text)
+    # Remove strikethrough
+    text = re.sub(r"~~([^~]+)~~", r"\1", text)
+    # Remove blockquotes
+    text = re.sub(r"^>\s?", "", text, flags=re.MULTILINE)
+    # Remove horizontal rules
+    text = re.sub(r"^[-*_]{3,}\s*$", "", text, flags=re.MULTILINE)
+    # Convert list markers to plain text
+    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
+    # Collapse multiple blank lines
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 class AudioGenerator:
@@ -141,14 +172,29 @@ class AudioGenerator:
         label = f"Chapter {chapter_num}" if chapter_num else "Chapter"
         console.print(f"[cyan]Generating audio: {label} ({engine.name})[/cyan]")
 
+        # Strip Markdown formatting for clean TTS input
+        plain_text = _strip_markdown(text)
+        if not plain_text:
+            console.print(f"[yellow]{label}: no speakable text after stripping markdown[/yellow]")
+            return None
+
         try:
             result = engine.synthesize(
-                text=text,
+                text=plain_text,
                 output_path=output_path,
                 voice=voice or self._voice,
                 speed=speed or self._speed,
                 **kwargs,
             )
+            # Validate output is non-empty
+            if result and result.exists() and result.stat().st_size < 100:
+                console.print(f"[yellow]{label}: output file too small ({result.stat().st_size}B), likely silent[/yellow]")
+                tried.add(engine.name)
+                if self._use_fallback:
+                    return self.generate_chapter(
+                        text, output_path, voice, speed, chapter_num, _tried=tried, **kwargs
+                    )
+                return None
             # Cache the engine that worked so subsequent chapters skip re-probing
             self._resolved_engine = engine
             console.print(f"[green]Audio saved:[/green] {result}")
