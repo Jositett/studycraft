@@ -397,6 +397,9 @@ class StudyCraft:
 
     def _generate_sequential(self, targets, generated, gen_fn, on_progress, on_check_control, progress, task):
         for idx, ch in enumerate(targets):
+            if on_check_control and on_check_control() == "stop":
+                console.print("[yellow]Generation stopped by user[/yellow]")
+                break
             if on_progress:
                 on_progress(idx, len(targets), f"Generating chapter {idx + 1} of {len(targets)}: {ch['title'][:40]}")
             progress.update(task, description=f"Ch {ch['num']}: {ch['title'][:40]}...")
@@ -411,7 +414,11 @@ class StudyCraft:
                 console.print("[yellow]Generation stopped by user[/yellow]")
                 break
             if ch is not targets[-1]:
-                time.sleep(self.rate_limit_seconds)
+                # Interruptible sleep
+                for _ in range(self.rate_limit_seconds):
+                    if on_check_control and on_check_control() == "stop":
+                        break
+                    time.sleep(1)
 
     # -- Chapter generation ----------------------------------------------------
 
