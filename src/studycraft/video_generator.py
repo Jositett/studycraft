@@ -73,6 +73,8 @@ def _sanitize(text: str) -> str:
     text = re.sub(r'\s*[a-z-]+\s*=\s*(["\']).*?\1', '', text, flags=re.IGNORECASE | re.DOTALL)
     # Remove HTML/XML tags and their content
     text = re.sub(r'<[^>]+>', '', text, flags=re.DOTALL)
+    # Remove orphaned HTML fragments (e.g., #CCC"> or #FFF'>)
+    text = re.sub(r'#[0-9A-Fa-f]{3,6}["\'][^\s]*', '', text)
     # Remove HTML entities
     text = re.sub(r'&(?:[a-zA-Z]+|#\d+|#x[\da-fA-F]+);', '', text)
     # Keep only printable ASCII + newlines
@@ -151,6 +153,7 @@ def _build_manim_scene(
     def esc(s: str) -> str:
         s = re.sub(r"<[^>]+>", "", s)          # strip HTML tags
         s = re.sub(r"&[a-zA-Z#0-9]+;", "", s)  # strip HTML entities
+        s = re.sub(r'#[0-9A-Fa-f]{3,6}["\'>\s]', '', s)  # strip broken color refs
         s = re.sub(r"[^\x20-\x7E]", "", s)     # ASCII printable only
         return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 

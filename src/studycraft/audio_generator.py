@@ -25,8 +25,8 @@ console = Console()
 
 def _strip_markdown(text: str) -> str:
     """Convert Markdown to plain text suitable for TTS synthesis."""
-    # Remove code blocks
-    text = re.sub(r"```[\s\S]*?```", "", text)
+    # Replace code blocks with a spoken placeholder (keep context)
+    text = re.sub(r"```[\w]*\n([\s\S]*?)```", r"\nCode example: \1\n", text)
     text = re.sub(r"`([^`]+)`", r"\1", text)
     # Remove images
     text = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", text)
@@ -174,9 +174,12 @@ class AudioGenerator:
 
         # Strip Markdown formatting for clean TTS input
         plain_text = _strip_markdown(text)
-        if not plain_text:
-            console.print(f"[yellow]{label}: no speakable text after stripping markdown[/yellow]")
+        if not plain_text or len(plain_text) < 20:
+            console.print(f"[yellow]{label}: no speakable text after stripping markdown (len={len(plain_text)})[/yellow]")
             return None
+        # Truncate very long text to avoid TTS timeouts (keep first ~3000 chars)
+        if len(plain_text) > 3000:
+            plain_text = plain_text[:3000]
 
         try:
             result = engine.synthesize(
@@ -187,7 +190,7 @@ class AudioGenerator:
                 **kwargs,
             )
             # Validate output is non-empty
-            if result and result.exists() and result.stat().st_size < 100:
+            if result and result.exists() and result.stat().st_size < 1000:
                 console.print(f"[yellow]{label}: output file too small ({result.stat().st_size}B), likely silent[/yellow]")
                 tried.add(engine.name)
                 if self._use_fallback:
