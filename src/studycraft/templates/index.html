@@ -238,25 +238,27 @@
     <h2>🔐 API Keys</h2>
     <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">Keys are stored in your browser only and never saved on the server.</p>
 
+    <form autocomplete="off" onsubmit="event.preventDefault();saveKeys()">
     <div class="key-field">
       <label>OpenRouter API Key <span class="key-status" id="openrouter-status"></span></label>
-      <input type="password" id="openrouter-key" placeholder="sk-or-v1-...">
+      <input type="password" id="openrouter-key" placeholder="sk-or-v1-..." autocomplete="off">
       <p class="key-hint">Required — Get a free key at <a href="https://openrouter.ai" target="_blank">openrouter.ai</a></p>
     </div>
 
     <div class="key-field">
       <label>HuggingFace Token <span class="key-status" id="hf-status"></span></label>
-      <input type="password" id="hf-key" placeholder="hf_...">
+      <input type="password" id="hf-key" placeholder="hf_..." autocomplete="off">
       <p class="key-hint">Optional — Faster RAG model downloads. Get one at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co</a></p>
     </div>
 
     <div class="key-field">
       <label>GitHub Token <span class="key-status" id="github-status"></span></label>
-      <input type="password" id="github-key" placeholder="ghp_...">
+      <input type="password" id="github-key" placeholder="ghp_..." autocomplete="off">
       <p class="key-hint">Optional — For publishing guides as Gists. <a href="https://github.com/settings/tokens" target="_blank">Create token</a> (gist scope)</p>
     </div>
 
-    <button type="button" class="key-save-btn" onclick="saveKeys()">Save to browser</button>
+    <button type="submit" class="key-save-btn">Save to browser</button>
+    </form>
   </div>
 
   <div class="card" id="upload-card">
@@ -612,7 +614,6 @@
      form.append('with_answers', document.getElementById('answers-check').checked ? '1' : '');
      form.append('with_audio', document.getElementById('audio-check').checked ? '1' : '');
      form.append('with_video', document.getElementById('video-check').checked ? '1' : '');
-    const saved = getSavedKeys();
     if (saved.openrouter) form.append('api_key', saved.openrouter);
     if (saved.hf) form.append('hf_token', saved.hf);
     if (saved.github) form.append('github_token', saved.github);
