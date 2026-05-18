@@ -23,6 +23,44 @@ from .tts_engines import (
 console = Console()
 
 
+def _chunk_text(text: str, max_chars: int = 500) -> list[str]:
+    """Split text into chunks at sentence boundaries for TTS."""
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    chunks = []
+    current = ""
+    for sent in sentences:
+        if len(current) + len(sent) + 1 > max_chars and current:
+            chunks.append(current.strip())
+            current = sent
+        else:
+            current = f"{current} {sent}" if current else sent
+    if current.strip():
+        chunks.append(current.strip())
+    return chunks or [text[:max_chars]]
+
+
+def _concatenate_audio(paths: list[Path], output_path: Path) -> None:
+    """Concatenate audio files using ffmpeg."""
+    import subprocess
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        for p in paths:
+            f.write(f"file '{p}'\n")
+        list_file = f.name
+    try:
+        subprocess.run(
+            ['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', list_file,
+             '-c:a', 'libmp3lame', '-q:a', '2', str(output_path)],
+            capture_output=True, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Fallback: just copy the first chunk
+        if paths:
+            output_path.write_bytes(paths[0].read_bytes())
+    finally:
+        Path(list_file).unlink(missing_ok=True)
+
+
 def _strip_markdown(text: str) -> str:
     """Convert Markdown to plain text suitable for TTS synthesis."""
     # Replace code blocks with a spoken placeholder (keep context)
@@ -177,18 +215,38 @@ class AudioGenerator:
         if not plain_text or len(plain_text) < 20:
             console.print(f"[yellow]{label}: no speakable text after stripping markdown (len={len(plain_text)})[/yellow]")
             return None
-        # Truncate very long text to avoid TTS timeouts (keep first ~3000 chars)
-        if len(plain_text) > 3000:
-            plain_text = plain_text[:3000]
 
         try:
-            result = engine.synthesize(
-                text=plain_text,
-                output_path=output_path,
-                voice=voice or self._voice,
-                speed=speed or self._speed,
-                **kwargs,
-            )
+            # Chunk text for TTS (engines have ~200-400 token internal limits)
+            chunks = _chunk_text(plain_text, max_chars=500)
+            if len(chunks) <= 1:
+                result = engine.synthesize(
+                    text=chunks[0] if chunks else plain_text[:500],
+                    output_path=output_path,
+                    voice=voice or self._voice,
+                    speed=speed or self._speed,
+                    **kwargs,
+                )
+            else:
+                import tempfile
+                chunk_paths = []
+                with tempfile.TemporaryDirectory() as tmp:
+                    for i, chunk in enumerate(chunks):
+                        chunk_path = Path(tmp) / f"chunk_{i:04d}.wav"
+                        engine.synthesize(
+                            text=chunk,
+                            output_path=chunk_path,
+                            voice=voice or self._voice,
+                            speed=speed or self._speed,
+                            **kwargs,
+                        )
+                        if chunk_path.exists() and chunk_path.stat().st_size > 100:
+                            chunk_paths.append(chunk_path)
+                    if chunk_paths:
+                        _concatenate_audio(chunk_paths, output_path)
+                    else:
+                        return None
+                result = output_path if output_path.exists() else None
             # Validate output is non-empty
             if result and result.exists() and result.stat().st_size < 1000:
                 console.print(f"[yellow]{label}: output file too small ({result.stat().st_size}B), likely silent[/yellow]")

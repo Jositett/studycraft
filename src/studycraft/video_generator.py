@@ -275,6 +275,9 @@ class ChapterScene(Scene):
 
 def _render_manim_scene(scene_script: str, output_path: Path) -> Path | None:
     """Write scene to temp file, render with Manim, return mp4 path."""
+    # Strip broken HTML color fragments that crash Manim (e.g. #CCC"> or #FFF'>)
+    # but preserve valid hex colors like #0f1117 (no trailing quotes/brackets)
+    scene_script = re.sub(r'#[0-9A-Fa-f]{3,8}["\'>][^\n]*', '', scene_script)
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         scene_file = tmp_path / "scene.py"
