@@ -315,7 +315,7 @@ def create_app() -> FastAPI:  # type: ignore
     return app
 
 
-async def _run_job(
+def _run_job_sync(
     job_id: str,
     doc_path: Path,
     subject: str | None,
@@ -329,7 +329,7 @@ async def _run_job(
     theme: str = "dark",
     difficulty: str = "intermediate",
 ):
-    """Background job that runs StudyCraft and updates the job store."""
+    """Synchronous job runner — called in a thread to avoid blocking the event loop."""
     try:
         store.update(job_id, status="running", progress=5, message="Loading document\u2026")
 
@@ -411,6 +411,31 @@ async def _run_job(
         )
     except Exception as exc:
         store.update(job_id, status="error", message=str(exc))
+
+
+async def _run_job(
+    job_id: str,
+    doc_path: Path,
+    subject: str | None,
+    model: str,
+    api_key: str,
+    with_answers: bool = False,
+    with_audio: bool = False,
+    with_video: bool = False,
+    context_files: list[str] | None = None,
+    store: object | None = None,
+    theme: str = "dark",
+    difficulty: str = "intermediate",
+):
+    """Background job wrapper — runs blocking work in a thread."""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(
+        None,
+        _run_job_sync,
+        job_id, doc_path, subject, model, api_key,
+        with_answers, with_audio, with_video,
+        context_files, store, theme, difficulty,
+    )
 
 
 def main():
