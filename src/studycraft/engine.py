@@ -10,7 +10,8 @@ from __future__ import annotations
 import re
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from openai import OpenAI
@@ -41,8 +42,32 @@ console = Console()
 ProgressCallback = Callable[[int, int, str], None] | None
 ControlCallback = Callable[[], str | None] | None
 
-DEFAULT_MODEL = "openrouter/free"
+DEFAULT_MODEL = "openrouter/free"  # cspell:disable-line
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
+_GENERATION_FAILED = "<!-- Generation failed"
+
+
+@dataclass
+class RunOptions:
+    """Options for a StudyCraft generation run."""
+
+    subject: str | None = None
+    resume_from: int = 1
+    only_chapter: int | None = None
+    with_answers: bool = False
+    on_progress: ProgressCallback = None
+    context_files: list[str | Path] | None = None
+    workers: int = 1
+    theme: str | None = None
+    on_check_control: ControlCallback = None
+    difficulty: str = "intermediate"
+    with_audio: bool = False
+    tts_engine: str | None = None
+    tts_voice: str | None = None
+    tts_speed: float | None = None
+    with_video: bool = False
+    video_model: str | None = None
+    video_resolution: str | None = None
 
 
 class StudyCraft:
@@ -93,46 +118,27 @@ class StudyCraft:
 
     # -- Public API ------------------------------------------------------------
 
-    def run(
+    def run(  # noqa: PLR0913
         self,
         document_path: str | Path,
-        subject: str | None = None,
-        resume_from: int = 1,
-        only_chapter: int | None = None,
-        with_answers: bool = False,
-        on_progress: ProgressCallback = None,
-        context_files: list[str | Path] | None = None,
-        workers: int = 1,
-        theme: str | None = None,
-        on_check_control: ControlCallback = None,
-        difficulty: str = "intermediate",
-        with_audio: bool = False,
-        tts_engine: str | None = None,
-        tts_voice: str | None = None,
-        tts_speed: float | None = None,
-        with_video: bool = False,
-        video_model: str | None = None,
-        video_resolution: str | None = None,
+        opts: RunOptions | None = None,
+        **kwargs,
     ) -> dict[str, Path]:
         """
         Full pipeline: load -> detect -> index -> generate -> export.
 
         Args:
             document_path: Path to any supported document.
-            subject: Override auto-detected subject name.
-            resume_from: Skip chapter numbers below this (uses cache).
-            only_chapter: Generate only this one chapter (by number).
-            context_files: Extra documents to index into RAG (not generated).
-            workers: Number of parallel workers for chapter generation.
-            with_audio: Generate audio guide using TTS.
-            tts_engine: TTS engine name (kitten, chatterbox, coqui, openrouter).
-            tts_voice: Voice name (engine-specific).
-            tts_speed: Playback speed multiplier.
-            with_video: Generate video guide using OpenRouter (free models only).
-            video_model: Video generation model ID (must be free).
-            video_resolution: Video resolution (720p or 1080p).
+            opts: RunOptions dataclass with all generation options.
+            **kwargs: Alternative to opts — pass options as keyword arguments.
         """
+        # Merge opts and kwargs for backward compatibility
+        if opts is None:
+            opts = RunOptions(**{k: v for k, v in kwargs.items() if k in RunOptions.__dataclass_fields__})
+
         doc_path = Path(document_path)
+        on_progress = opts.on_progress
+        on_check_control = opts.on_check_control
 
         # 1. Load document
         raw_text = load_document(doc_path)
@@ -140,7 +146,7 @@ class StudyCraft:
             raise ValueError("Document appears to be empty or unreadable.")
 
         # 2. Detect subject name
-        doc_subject = subject or _infer_subject(doc_path, raw_text)
+        doc_subject = opts.subject or _infer_subject(doc_path, raw_text)
         console.print(f"[bold cyan]Subject:[/bold cyan] {doc_subject}")
 
         # 3. Detect chapters
@@ -156,7 +162,7 @@ class StudyCraft:
         self.rag.index(raw_text, source_name=doc_path.stem)
 
         # 4b. Index supplementary context files
-        for ctx_path in context_files or []:
+        for ctx_path in opts.context_files or []:
             ctx_path = Path(ctx_path)
             try:
                 ctx_text = load_document(ctx_path)
@@ -170,45 +176,26 @@ class StudyCraft:
 
         targets = (
             chapters
-            if only_chapter is None
-            else [ch for ch in chapters if int(ch["num"].split(".")[0]) == only_chapter]
+            if opts.only_chapter is None
+            else [ch for ch in chapters if int(ch["num"].split(".")[0]) == opts.only_chapter]
         )
 
         generated = self._generate_all(
             targets,
             doc_subject,
             cache_dir,
-            resume_from,
+            opts.resume_from,
             on_progress,
-            workers,
+            opts.workers,
             on_check_control,
-            difficulty,
+            opts.difficulty,
         )
 
         # 6. Review pass — fix chapters with unfilled placeholders
-        console.print("[cyan]Reviewing chapters...[/cyan]")
-        for idx, content in enumerate(generated):
-            if not content or "<!-- Generation failed" in content:
-                continue
-            try:
-                result = validate_chapter(content, label=f"Ch {idx + 1}")
-                if not result.passed and result.placeholder_count > 0:
-                    if on_progress:
-                        on_progress(
-                            len(targets),
-                            len(targets),
-                            f"Fixing chapter {idx + 1} placeholders...",
-                        )
-                    fixed = self._fix_placeholders(content, doc_subject)
-                    if fixed:
-                        generated[idx] = fixed
-                        console.print(f"  [green]Ch {idx + 1}: fixed placeholders[/green]")
-
-            except Exception as exc:
-                console.print(f"  [yellow]Ch {idx + 1} review skipped: {exc}[/yellow]")
+        self._review_chapters(generated, doc_subject, targets, on_progress)
 
         # 7. Answer key (optional)
-        if with_answers:
+        if opts.with_answers:
             if on_progress:
                 on_progress(len(targets), len(targets), "Generating answer key...")
             console.print("[cyan]Generating answer key...[/cyan]")
@@ -219,84 +206,16 @@ class StudyCraft:
             console.print(f"[green]Answer Key[/green] -> {ak_path}")
 
         # 7b. Audio generation (optional)
-        audio_paths = {}
-        if with_audio:
-            if on_progress:
-                on_progress(len(targets), len(targets), "Generating audio guide...")
-            console.print("[cyan]Generating audio guide...[/cyan]")
-
-            from .audio_generator import AudioGenerator
-
-            engine_name = tts_engine or self._tts_engine_name
-            voice = tts_voice or self._tts_voice
-            speed = tts_speed or self._tts_speed
-
-            audio_gen = AudioGenerator(
-                engine_name=engine_name,
-                voice=voice,
-                speed=speed,
-            )
-
-            # Prepare chapters for audio generation
-            audio_chapters = []
-            for idx, content in enumerate(generated):
-                if content and "<!-- Generation failed" not in content:
-                    audio_chapters.append(
-                        {
-                            "num": targets[idx]["num"],
-                            "title": targets[idx].get("title", f"Chapter {targets[idx]['num']}"),
-                            "content": content,
-                        }
-                    )
-
-            audio_dir = self.output_dir / "audio"
-            audio_paths = audio_gen.generate_all_chapters(
-                chapters=audio_chapters,
-                output_dir=audio_dir,
-                subject=doc_subject,
-                on_progress=on_progress,
-            )
-            console.print(f"[green]Audio guide:[/green] {len(audio_paths)} chapters -> {audio_dir}")
+        audio_paths = self._run_audio(
+            generated, targets, doc_subject, on_progress,
+            opts.with_audio, opts.tts_engine, opts.tts_voice, opts.tts_speed,
+        )
 
         # 7c. Video generation (optional)
-        video_paths = {}
-        if with_video:
-            if on_progress:
-                on_progress(len(targets), len(targets), "Generating video guide...")
-            console.print("[cyan]Generating video guide...[/cyan]")
-
-            from .video_generator import VideoGenerator
-
-            v_model = video_model or self._video_model
-
-            video_gen = VideoGenerator(
-                api_key=self.api_key,
-                model=v_model,
-                output_dir=self.output_dir / "videos",
-            )
-
-            # Prepare chapters for video generation
-            video_chapters = []
-            for idx, content in enumerate(generated):
-                if content and "<!-- Generation failed" not in content:
-                    video_chapters.append(
-                        {
-                            "num": targets[idx]["num"],
-                            "title": targets[idx].get("title", f"Chapter {targets[idx]['num']}"),
-                            "content": content,
-                        }
-                    )
-
-            video_paths = video_gen.generate_all_chapters(
-                chapters=video_chapters,
-                output_dir=self.output_dir / "videos",
-                audio_paths=audio_paths or {},
-                on_progress=on_progress,
-            )
-            console.print(
-                f"[green]Video guide:[/green] {len(video_paths)} chapters -> "
-                f"{self.output_dir / 'videos'}"
-            )
+        video_paths = self._run_video(
+            generated, targets, on_progress, opts.with_video,
+            opts.video_model, opts.video_resolution, audio_paths,
+        )
 
         # 8. Export
         combined = "\n\n---\n\n".join(generated)
@@ -307,7 +226,7 @@ class StudyCraft:
             combined,
             self.output_dir,
             base_name=f"{safe_name}_Practice_Guide",
-            theme=theme,
+            theme=opts.theme,
         )
 
         # Add audio paths to result
@@ -319,6 +238,101 @@ class StudyCraft:
             result["video"] = video_paths
 
         return result
+
+    # -- Post-generation helpers ------------------------------------------------
+
+    def _review_chapters(
+        self, generated: list[str], subject: str, targets: list, on_progress: ProgressCallback
+    ) -> None:
+        """Fix chapters with unfilled placeholders."""
+        console.print("[cyan]Reviewing chapters...[/cyan]")
+        for idx, content in enumerate(generated):
+            if not content or _GENERATION_FAILED in content:
+                continue
+            try:
+                result = validate_chapter(content, label=f"Ch {idx + 1}")
+                if not result.passed and result.placeholder_count > 0:
+                    if on_progress:
+                        on_progress(len(targets), len(targets), f"Fixing chapter {idx + 1} placeholders...")
+                    fixed = self._fix_placeholders(content, subject)
+                    if fixed:
+                        generated[idx] = fixed
+                        console.print(f"  [green]Ch {idx + 1}: fixed placeholders[/green]")
+            except Exception as exc:
+                console.print(f"  [yellow]Ch {idx + 1} review skipped: {exc}[/yellow]")
+
+    def _collect_valid_chapters(self, generated: list[str], targets: list) -> list[dict]:
+        """Collect chapters that generated successfully."""
+        chapters = []
+        for idx, content in enumerate(generated):
+            if content and _GENERATION_FAILED not in content:
+                chapters.append({
+                    "num": targets[idx]["num"],
+                    "title": targets[idx].get("title", f"Chapter {targets[idx]['num']}"),
+                    "content": content,
+                })
+        return chapters
+
+    def _run_audio(
+        self, generated: list[str], targets: list, subject: str,
+        on_progress: ProgressCallback, with_audio: bool,
+        tts_engine: str | None, tts_voice: str | None, tts_speed: float | None,
+    ) -> dict:
+        """Generate audio guide if requested."""
+        if not with_audio:
+            return {}
+        if on_progress:
+            on_progress(len(targets), len(targets), "Generating audio guide...")
+        console.print("[cyan]Generating audio guide...[/cyan]")
+
+        from .audio_generator import AudioGenerator
+
+        audio_gen = AudioGenerator(
+            engine_name=tts_engine or self._tts_engine_name,
+            voice=tts_voice or self._tts_voice,
+            speed=tts_speed or self._tts_speed,
+        )
+        audio_dir = self.output_dir / "audio"
+        audio_paths = audio_gen.generate_all_chapters(
+            chapters=self._collect_valid_chapters(generated, targets),
+            output_dir=audio_dir,
+            subject=subject,
+            on_progress=on_progress,
+        )
+        console.print(f"[green]Audio guide:[/green] {len(audio_paths)} chapters -> {audio_dir}")
+        return audio_paths
+
+    def _run_video(
+        self, generated: list[str], targets: list, on_progress: ProgressCallback,
+        with_video: bool, video_model: str | None, video_resolution: str | None,
+        audio_paths: dict,
+    ) -> dict:
+        """Generate video guide if requested."""
+        if not with_video:
+            return {}
+        if on_progress:
+            on_progress(len(targets), len(targets), "Generating video guide...")
+        console.print("[cyan]Generating video guide...[/cyan]")
+
+        from .video_generator import VideoGenerator
+
+        video_gen = VideoGenerator(
+            api_key=self.api_key,
+            model=video_model or self._video_model,
+            output_dir=self.output_dir / "videos",
+            resolution=video_resolution or self._video_resolution,
+        )
+        video_paths = video_gen.generate_all_chapters(
+            chapters=self._collect_valid_chapters(generated, targets),
+            output_dir=self.output_dir / "videos",
+            audio_paths=audio_paths or {},
+            on_progress=on_progress,
+        )
+        console.print(
+            f"[green]Video guide:[/green] {len(video_paths)} chapters -> "
+            f"{self.output_dir / 'videos'}"
+        )
+        return video_paths
 
     # -- Generation (sequential or parallel) -----------------------------------
 
@@ -356,53 +370,48 @@ class StudyCraft:
             task = progress.add_task("Generating chapters...", total=len(targets))
 
             if workers > 1 and len(targets) > 1:
-                console.print(f"[cyan]Parallel mode: {workers} workers[/cyan]")
-                with ThreadPoolExecutor(max_workers=workers) as pool:
-                    futures = [pool.submit(_gen_one, i, ch) for i, ch in enumerate(targets)]
-                    for future in futures:
-                        idx, content = future.result()
-                        generated[idx] = content
-                        msg = f"Completed chapter {idx + 1} of {len(targets)}"
-                        if on_progress:
-                            on_progress(idx + 1, len(targets), msg)
-                        progress.advance(task)
-
-                        # Check for pause/stop (pause handled by blocking callback)
-                        if on_check_control:
-                            signal = on_check_control()
-                            if signal == "stop":
-                                pool.shutdown(wait=False, cancel_futures=True)
-                                console.print("[yellow]Generation stopped by user[/yellow]")
-                                break
+                self._generate_parallel(
+                    targets, generated, _gen_one, workers, on_progress, on_check_control, progress, task
+                )
             else:
-                for idx, ch in enumerate(targets):
-                    msg = f"Generating chapter {idx + 1} of {len(targets)}: {ch['title'][:40]}"
-                    if on_progress:
-                        on_progress(idx, len(targets), msg)
-                    progress.update(task, description=f"Ch {ch['num']}: {ch['title'][:40]}...")
-
-                    _, content = _gen_one(idx, ch)
-                    generated[idx] = content
-                    progress.advance(task)
-
-                    if on_progress:
-                        on_progress(
-                            idx + 1,
-                            len(targets),
-                            f"Completed chapter {idx + 1} of {len(targets)}",
-                        )
-
-                    # Check for pause/stop
-                    if on_check_control:
-                        signal = on_check_control()
-                        if signal == "stop":
-                            console.print("[yellow]Generation stopped by user[/yellow]")
-                            break
-
-                    if ch is not targets[-1]:
-                        time.sleep(self.rate_limit_seconds)
+                self._generate_sequential(
+                    targets, generated, _gen_one, on_progress, on_check_control, progress, task
+                )
 
         return generated
+
+    def _generate_parallel(self, targets, generated, gen_fn, workers, on_progress, on_check_control, progress, task):
+        console.print(f"[cyan]Parallel mode: {workers} workers[/cyan]")
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(gen_fn, i, ch) for i, ch in enumerate(targets)]
+            for future in futures:
+                idx, content = future.result()
+                generated[idx] = content
+                if on_progress:
+                    on_progress(idx + 1, len(targets), f"Completed chapter {idx + 1} of {len(targets)}")
+                progress.advance(task)
+                if on_check_control and on_check_control() == "stop":
+                    pool.shutdown(wait=False, cancel_futures=True)
+                    console.print("[yellow]Generation stopped by user[/yellow]")
+                    break
+
+    def _generate_sequential(self, targets, generated, gen_fn, on_progress, on_check_control, progress, task):
+        for idx, ch in enumerate(targets):
+            if on_progress:
+                on_progress(idx, len(targets), f"Generating chapter {idx + 1} of {len(targets)}: {ch['title'][:40]}")
+            progress.update(task, description=f"Ch {ch['num']}: {ch['title'][:40]}...")
+
+            _, content = gen_fn(idx, ch)
+            generated[idx] = content
+            progress.advance(task)
+
+            if on_progress:
+                on_progress(idx + 1, len(targets), f"Completed chapter {idx + 1} of {len(targets)}")
+            if on_check_control and on_check_control() == "stop":
+                console.print("[yellow]Generation stopped by user[/yellow]")
+                break
+            if ch is not targets[-1]:
+                time.sleep(self.rate_limit_seconds)
 
     # -- Chapter generation ----------------------------------------------------
 
@@ -572,7 +581,7 @@ Proceed to fill every placeholder and generate the complete chapter:"""
             console.print(f"  [red]LLM error ch {chapter['num']}: {exc}[/red]")
             return (
                 f"# Chapter {chapter['num']}: {chapter['title']}\n\n"
-                f"<!-- Generation failed: {exc} -->\n"
+                f"{_GENERATION_FAILED}: {exc} -->\n"
             )
 
     def _llm_call_with_backoff(
@@ -581,102 +590,116 @@ Proceed to fill every placeholder and generate the complete chapter:"""
         temperature: float = 0.3,
         max_attempts: int = 4,
         timeout: int = 90,
+        wall_timeout: int = 180,
     ) -> str:
-        """Call the LLM with exponential backoff and auto model switching."""
+        """Call the LLM with exponential backoff, wall-clock timeout, and auto model switching."""
         last_exc = None
         truncations = 0
         empty_count = 0
         for attempt in range(max_attempts):
             try:
-                resp = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=temperature,
-                    max_tokens=4500,
-                    timeout=timeout,
-                )
+                resp = self._call_with_wall_timeout(prompt, temperature, timeout, wall_timeout)
                 content = resp.choices[0].message.content
-                # Empty response — switch model after 1 retry (not 3)
-                if not content or not content.strip():
-                    empty_count += 1
-                    if empty_count >= 2:
-                        # This model consistently returns empty — switch immediately
-                        console.print(f"  [yellow]Model {self.model} returns empty — switching[/yellow]")
-                        switched = self._try_switch_model()
-                        if switched:
-                            empty_count = 0
-                            continue
-                        raise ValueError("LLM returned empty response after retries")
-                    wait = self.rate_limit_seconds
-                    console.print(f"  [yellow]Empty response, retrying in {wait}s...[/yellow]")
-                    time.sleep(wait)
+                empty_count, should_continue = self._handle_empty_response(content, empty_count)
+                if should_continue:
                     continue
-                return content.strip()
+                if content:
+                    return content.strip()
             except BaseException as exc:
                 last_exc = exc
-                err = str(exc)
-                # Never switch models on auth errors — surface them immediately
-                if "401" in err:
-                    raise
-                # Catch non-standard exceptions (e.g. "exceptions must derive from BaseException")
-                if "must derive from BaseException" in err or not isinstance(exc, Exception):
-                    console.print(f"  [yellow]Model {self.model} internal error — switching[/yellow]")
-                    switched = self._try_switch_model()
-                    if switched:
-                        continue
-                    raise RuntimeError(f"LLM internal error: {err}") from exc
-                # JSON decode / malformed response — treat as transient, retry with backoff
-                is_json_err = (
-                    "Expecting value" in err or "JSONDecodeError" in err or "json" in err.lower()
+                prompt, truncations = self._handle_llm_error(
+                    exc, attempt, max_attempts, prompt, truncations
                 )
-                retryable = (
-                    "429" in err or "500" in err or "502" in err or "503" in err or is_json_err
-                )
-                if retryable and attempt < max_attempts - 1:
-                    wait = self.rate_limit_seconds * (2**attempt)
-                    console.print(f"  [yellow]Error {err[:60]}... waiting {wait}s[/yellow]")
-                    time.sleep(wait)
-                elif "400" in err and truncations < 2 and len(prompt) > 500:
-                    console.print("  [yellow]400 error, truncating prompt and retrying...[/yellow]")
-                    prompt = prompt[: len(prompt) * 2 // 3]
-                    truncations += 1
-                    time.sleep(self.rate_limit_seconds)
-                else:
-                    # Switch model for model-specific errors or after exhausting retries
-                    if "404" in err or "503" in err or attempt == max_attempts - 1:
-                        switched = self._try_switch_model()
-                        if switched and attempt < max_attempts - 1:
-                            continue
+                if prompt is None:
                     raise
         raise last_exc  # type: ignore[misc]
+
+    def _handle_empty_response(self, content: str | None, empty_count: int) -> tuple[int, bool]:
+        """Handle empty LLM responses. Returns (updated_count, should_continue)."""
+        if content and content.strip():
+            return empty_count, False
+        empty_count += 1
+        if empty_count >= 2:
+            console.print(f"  [yellow]Model {self.model} returns empty — switching[/yellow]")
+            if self._try_switch_model():
+                return 0, True
+            raise ValueError("LLM returned empty response after retries")
+        console.print(f"  [yellow]Empty response, retrying in {self.rate_limit_seconds}s...[/yellow]")
+        time.sleep(self.rate_limit_seconds)
+        return empty_count, True
+
+    def _call_with_wall_timeout(self, prompt: str, temperature: float, timeout: int, wall_timeout: int):
+        """Execute a single LLM call with a hard wall-clock deadline."""
+        from concurrent.futures import ThreadPoolExecutor as _TPE
+
+        # Capture current values to avoid closure-over-loop-variable issues
+        _prompt, _temp, _timeout = prompt, temperature, timeout
+
+        def _do_call(_p=_prompt, _t=_temp, _to=_timeout):
+            return self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": _p}],
+                temperature=_t,
+                max_tokens=4500,
+                timeout=_to,
+            )
+
+        with _TPE(max_workers=1) as pool:
+            future = pool.submit(_do_call)
+            try:
+                return future.result(timeout=wall_timeout)
+            except (FuturesTimeout, TimeoutError):
+                future.cancel()
+                raise TimeoutError(f"LLM call exceeded {wall_timeout}s wall-clock timeout")
+
+    def _handle_llm_error(
+        self, exc: BaseException, attempt: int, max_attempts: int, prompt: str, truncations: int
+    ) -> tuple[str | None, int]:
+        """Handle LLM errors with retry logic. Returns (prompt, truncations) or (None, _) to re-raise."""
+        err = str(exc)
+        if "401" in err:
+            return None, truncations
+        if "must derive from BaseException" in err or not isinstance(exc, Exception):
+            console.print(f"  [yellow]Model {self.model} internal error — switching[/yellow]")
+            if self._try_switch_model():
+                return prompt, truncations
+            raise RuntimeError(f"LLM internal error: {err}") from exc
+
+        is_retryable = self._is_retryable_error(err)
+        if is_retryable and attempt < max_attempts - 1:
+            wait = self.rate_limit_seconds * (2 ** attempt)
+            console.print(f"  [yellow]Error {err[:60]}... waiting {wait}s[/yellow]")
+            time.sleep(wait)
+            return prompt, truncations
+        if "400" in err and truncations < 2 and len(prompt) > 500:
+            console.print("  [yellow]400 error, truncating prompt and retrying...[/yellow]")
+            time.sleep(self.rate_limit_seconds)
+            return prompt[: len(prompt) * 2 // 3], truncations + 1
+        if ("404" in err or "503" in err or attempt == max_attempts - 1) and attempt < max_attempts - 1:
+            if self._try_switch_model():
+                return prompt, truncations
+        return None, truncations
+
+    @staticmethod
+    def _is_retryable_error(err: str) -> bool:
+        """Check if an error string indicates a retryable condition."""
+        is_json_err = "Expecting value" in err or "JSONDecodeError" in err or "json" in err.lower()
+        return "429" in err or "500" in err or "502" in err or "503" in err or is_json_err
 
     def _try_switch_model(self) -> bool:
         """Attempt to switch to the next verified fallback model. Returns True if switched."""
         if self._switches_used >= self._max_model_switches:
             return False
 
-        # Always re-fetch so we use the freshest health cache
         from .model_registry import get_fallback_chain, test_model
 
         self._fallback_chain = get_fallback_chain(self.api_key)
-
-        # Track failures for current model
         self._model_failures[self.model] = self._model_failures.get(self.model, 0) + 1
 
-        # Find next model not yet failed, and probe it before committing
         for candidate in self._fallback_chain:
-            if candidate == self.model:
+            if candidate == self.model or self._model_failures.get(candidate, 0) >= 1:
                 continue
-            if self._model_failures.get(candidate, 0) >= 1:
-                continue
-            console.print(f"  [dim]Probing candidate model: {candidate}...[/dim]")
-            try:
-                if not test_model(self.api_key, candidate):
-                    console.print(f"  [yellow]Candidate {candidate} failed probe, skipping[/yellow]")
-                    self._model_failures[candidate] = 2  # mark as bad
-                    continue
-            except Exception:
-                self._model_failures[candidate] = 2
+            if not self._probe_candidate(candidate, test_model):
                 continue
             old = self.model
             self.model = candidate
@@ -687,6 +710,19 @@ Proceed to fill every placeholder and generate the complete chapter:"""
             )
             return True
         return False
+
+    def _probe_candidate(self, candidate: str, test_fn) -> bool:
+        """Probe a candidate model. Returns True if healthy."""
+        console.print(f"  [dim]Probing candidate model: {candidate}...[/dim]")
+        try:
+            if not test_fn(self.api_key, candidate):
+                console.print(f"  [yellow]Candidate {candidate} failed probe, skipping[/yellow]")
+                self._model_failures[candidate] = 2
+                return False
+        except Exception:
+            self._model_failures[candidate] = 2
+            return False
+        return True
 
     # -- Answer key generation -------------------------------------------------
 
@@ -708,48 +744,53 @@ Proceed to fill every placeholder and generate the complete chapter:"""
         return None
 
     def _generate_answer_key(self, chapter_contents: list[str], subject: str) -> str:
-        """Generate an answer key from all chapter quiz questions and exercises."""
+        """Generate an answer key in batches to avoid overwhelming free models."""
+        sections = self._extract_answer_sections(chapter_contents)
+        if not sections:
+            return f"# Answer Key -- {subject}\n\nNo quiz questions or exercises found."
+
+        all_answers = self._generate_answer_batches(sections, subject)
+        body = "\n\n---\n\n".join(all_answers) if all_answers else "Generation failed."
+        return f"# Answer Key -- {subject}\n\n{body}"
+
+    @staticmethod
+    def _extract_answer_sections(chapter_contents: list[str]) -> list[str]:
+        """Extract quiz and exercise sections from generated chapters."""
         sections = []
         for content in chapter_contents:
-            # Skip failed chapters — they have no usable quiz content
-            if not content or "<!-- Generation failed" in content:
+            if not content or _GENERATION_FAILED in content:
                 continue
             for heading in ("Chapter Quiz", "Practice Exercises"):
                 parts = re.split(rf"(?i)##\s*\d*\.?\s*{heading}", content)
                 if len(parts) > 1:
                     section_text = parts[1].split("##")[0].strip()
                     sections.append(f"### {heading}\n{section_text}")
+        return sections
 
-        if not sections:
-            return f"# Answer Key -- {subject}\n\nNo quiz questions or exercises found."
-
-        # Limit total content to avoid token overflow: max 20 sections, each capped at ~1500 chars
-        capped_sections = [s[:1500] for s in sections[:20]]
-        combined = "\n\n".join(capped_sections)
-        prompt = (
-            f"You are an expert educator. Generate a complete answer key for the following "
-            f"quiz questions and practice exercises from a {subject} study guide.\n\n"
-            f"For each question/exercise:\n"
-            f"- Restate the question number\n"
-            f"- Provide the correct answer with a brief explanation\n\n"
-            f"QUESTIONS AND EXERCISES:\n{combined}\n\n"
-            f"Format as clean Markdown with clear numbering."
-        )
-
-        try:
-            body = self._llm_call_with_backoff(prompt=prompt, temperature=0.2)
-            result = f"# Answer Key -- {subject}\n\n{body}"
-            # Retry if result looks incomplete
-            if len(result) < 200 or "<!-- Generation failed" in result:
-                body = self._llm_call_with_backoff(prompt=prompt, temperature=0.3)
-                result = f"# Answer Key -- {subject}\n\n{body}"
-            return result
-        except Exception:
+    def _generate_answer_batches(self, sections: list[str], subject: str) -> list[str]:
+        """Generate answers in batches of 6 sections."""
+        batch_size = 6
+        all_answers: list[str] = []
+        for i in range(0, len(sections), batch_size):
+            batch = [s[:1200] for s in sections[i : i + batch_size]]
+            combined = "\n\n".join(batch)
+            prompt = (
+                f"You are an expert educator. Generate answers for these "
+                f"{subject} quiz questions and exercises.\n\n"
+                f"For each question: restate the number, give the correct answer "
+                f"with a brief explanation.\n\n"
+                f"QUESTIONS:\n{combined}\n\n"
+                f"Format as clean Markdown."
+            )
             try:
-                body = self._llm_call_with_backoff(prompt=prompt, temperature=0.3)
-                return f"# Answer Key -- {subject}\n\n{body}"
+                body = self._llm_call_with_backoff(prompt=prompt, temperature=0.2, wall_timeout=120)
+                if body and _GENERATION_FAILED not in body:
+                    all_answers.append(body)
             except Exception as exc:
-                return f"# Answer Key -- {subject}\n\n<!-- Generation failed: {exc} -->"
+                all_answers.append(f"<!-- Batch {i // batch_size + 1} failed: {exc} -->")
+                console.print(f"  [yellow]Answer key batch {i // batch_size + 1} failed: {exc}[/yellow]")
+            time.sleep(self.rate_limit_seconds)
+        return all_answers
 
 
 # -- Helpers -------------------------------------------------------------------

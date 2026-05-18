@@ -74,7 +74,7 @@ def _sanitize(text: str) -> str:
     # Remove HTML/XML tags and their content
     text = re.sub(r'<[^>]+>', '', text, flags=re.DOTALL)
     # Remove HTML entities
-    text = re.sub(r'&(?:[a-zA-Z]+|#[0-9]+|#x[0-9a-fA-F]+);', '', text)
+    text = re.sub(r'&(?:[a-zA-Z]+|#\d+|#x[\da-fA-F]+);', '', text)
     # Keep only printable ASCII + newlines
     text = re.sub(r'[^\x20-\x7E\n]', '', text)
     # Collapse multiple spaces/newlines
@@ -485,6 +485,7 @@ class VideoGenerator:
         model: str | None = None,
         base_url: str = _VIDEO_API_BASE,
         output_dir: str | Path = "output/videos",
+        resolution: str | None = None,
     ) -> None:
         from os import getenv
 
@@ -493,6 +494,7 @@ class VideoGenerator:
         self._output_dir = Path(output_dir)
         self._output_dir.mkdir(parents=True, exist_ok=True)
         self._model = self._resolve_model(model)
+        self._resolution = resolution or "720p"
 
     def _resolve_model(self, requested: str | None) -> str | None:
         if not self._api_key:

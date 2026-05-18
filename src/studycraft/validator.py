@@ -76,7 +76,7 @@ def validate_chapter(text: str, label: str = "") -> ValidationResult:
         "Mini Project": r"(?i)mini\s+projects?|projects?|capstone|hands.?on",
         "Chapter Quiz": r"(?i)chapters?\s+quizzes?|chapter\s+test|assessment|quiz",
         "Reflection": r"(?i)reflections?|self.?assessment|reflection\s+questions?",
-        "Tips & Common Mistakes": r"(?i)tips?\s+[&and]\s+(?:common\s+)?mistakes?|common\s+mistakes?|gotchas?|pitfalls?|watch\s+out",
+        "Tips & Common Mistakes": r"(?i)tips?\s+[&and]\s+(?:common\s+)?mistakes?|common\s+mistakes?|pitfalls?|watch\s+out",
     }
     
     text_lower = text.lower()
@@ -85,7 +85,7 @@ def validate_chapter(text: str, label: str = "") -> ValidationResult:
             result.missing_sections.append(section_name)
 
     # Count worked examples (### Example N patterns)
-    result.example_count = len(re.findall(r"###\s+(?:example|worked\s+example|example)\s+\d", text, re.IGNORECASE))
+    result.example_count = len(re.findall(r"###\s+(?:worked\s+)?example\s+\d", text, re.IGNORECASE))
 
     # Count quiz questions (numbered lines under quiz section)
     quiz_match = re.split(r"(?i)##\s*\d*\.?\s*(?:chapter\s+)?quiz", text)
