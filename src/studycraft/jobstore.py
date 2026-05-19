@@ -13,7 +13,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-_EXPIRY_SECONDS = 86400  # 24 hours
+_EXPIRY_SECONDS = 172800  # 48 hours
 
 # Allowed column names for update() to prevent SQL injection via kwargs keys
 _ALLOWED_COLS = {"status", "progress", "message", "files", "control"}

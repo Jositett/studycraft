@@ -443,7 +443,55 @@
 <script>
   // ── BYOK key management ──
   const KEY_STORAGE = 'studycraft_keys';
+  const JOB_STORAGE = 'studycraft_active_job';
   let serverConfig = {};
+
+  // ── Job persistence across refreshes ──
+  function saveActiveJob(jobId) {
+    localStorage.setItem(JOB_STORAGE, JSON.stringify({ id: jobId, ts: Date.now() }));
+  }
+  function clearActiveJob() {
+    localStorage.removeItem(JOB_STORAGE);
+  }
+  function getActiveJob() {
+    try {
+      const data = JSON.parse(localStorage.getItem(JOB_STORAGE) || 'null');
+      if (!data) return null;
+      // Expire after 48h
+      if (Date.now() - data.ts > 48 * 60 * 60 * 1000) { clearActiveJob(); return null; }
+      return data.id;
+    } catch { return null; }
+  }
+
+  // On page load, check for active job and reconnect
+  async function checkActiveJob() {
+    const jobId = getActiveJob();
+    if (!jobId) return;
+    try {
+      const res = await fetch(`/api/status/${jobId}`);
+      if (!res.ok) { clearActiveJob(); return; }
+      const job = await res.json();
+      if (job.status === 'done') {
+        showResults(jobId, job.files);
+        clearActiveJob();
+      } else if (job.status === 'error') {
+        showError('Previous job failed', job.message);
+        clearActiveJob();
+      } else if (job.status === 'stopped') {
+        if (job.files && Object.keys(job.files).length) showResults(jobId, job.files);
+        clearActiveJob();
+      } else {
+        // Still running — reconnect SSE
+        currentJobId = jobId;
+        document.getElementById('upload-card').style.opacity = '.5';
+        document.getElementById('generate-btn').disabled = true;
+        document.getElementById('progress-card').style.display = 'block';
+        document.getElementById('progress-bar').style.width = (job.progress || 0) + '%';
+        document.getElementById('status-text').textContent = job.message || 'Reconnecting…';
+        connectSSE(jobId);
+      }
+    } catch { clearActiveJob(); }
+  }
 
   function getSavedKeys() {
     try { return JSON.parse(localStorage.getItem(KEY_STORAGE) || '{}'); } catch { return {}; }
@@ -524,6 +572,7 @@
     loadModels(true).then(() => { btn.style.color = ''; btn.style.borderColor = ''; });
   }
   loadModels();
+  checkActiveJob();
 
   // Context files drop zone
   const ctxZone = document.getElementById('ctx-drop-zone');
@@ -636,6 +685,7 @@
       if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
       jobId = data.job_id;
       currentJobId = jobId;
+      saveActiveJob(jobId);
     } catch(e) {
       showError('Generation failed', e.message);
       btn.disabled = false;
@@ -645,6 +695,11 @@
     }
 
     // Stream status via SSE
+    connectSSE(jobId);
+  }
+
+  function connectSSE(jobId) {
+    const btn = document.getElementById('generate-btn');
     const startTime = Date.now();
     const source = new EventSource(`/api/stream/${jobId}`);
     source.onmessage = function(event) {
@@ -677,9 +732,11 @@
 
       if (d.status === 'done') {
         source.close();
+        clearActiveJob();
         showResults(jobId, d.files);
       } else if (d.status === 'stopped') {
         source.close();
+        clearActiveJob();
         document.getElementById('status-text').textContent = 'Generation stopped';
         document.getElementById('status-text').classList.remove('running');
         document.getElementById('pause-btn').style.display = 'none';
@@ -689,6 +746,7 @@
         if (d.files && Object.keys(d.files).length) showResults(jobId, d.files);
       } else if (d.status === 'error') {
         source.close();
+        clearActiveJob();
         showError('Generation error', d.message);
         btn.disabled = false;
         document.getElementById('upload-card').style.opacity = '1';
@@ -697,9 +755,10 @@
     };
     source.onerror = function() {
       source.close();
-      showError('Connection lost', 'Lost connection to the server. The job may still be running — refresh to check.');
-      btn.disabled = false;
-      document.getElementById('upload-card').style.opacity = '1';
+      // Don't clear active job — it may still be running on the server
+      showToast('warn', 'Connection lost', 'The job is still running in the background. Refresh to reconnect.', 15000);
+      document.getElementById('status-text').textContent = 'Connection lost — job still running. Refresh to reconnect.';
+      document.getElementById('status-text').classList.remove('running');
     };
   }
 
@@ -785,6 +844,8 @@
 
   function resetUI() {
     selectedFile = null;
+    currentJobId = null;
+    clearActiveJob();
     fileName.textContent = '';
     fileInput.value = '';
     dropZone.classList.remove('has-file');
