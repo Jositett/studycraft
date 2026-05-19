@@ -642,6 +642,15 @@
       return;
     }
 
+    // Check file size (HF Spaces limit ~200MB, warn at 50MB)
+    if (selectedFile.size > 200 * 1024 * 1024) {
+      showError('File too large', 'Maximum file size is 200MB. Please use a smaller file.');
+      return;
+    }
+    if (selectedFile.size > 50 * 1024 * 1024) {
+      showToast('warn', 'Large file', 'Files over 50MB may take a while to upload and process.', 8000);
+    }
+
     // Validate API key
     const saved = getSavedKeys();
     if (!saved.openrouter && !serverConfig.has_openrouter) {
@@ -670,7 +679,10 @@
 
     let jobId;
     try {
-      const res = await fetch('/api/generate', { method: 'POST', body: form });
+      const controller = new AbortController();
+      const uploadTimeout = setTimeout(() => controller.abort(), 120000);
+      const res = await fetch('/api/generate', { method: 'POST', body: form, signal: controller.signal });
+      clearTimeout(uploadTimeout);
       let data;
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
@@ -679,7 +691,7 @@
         const text = await res.text();
         throw new Error(
           `Server returned ${res.status} ${res.statusText}` +
-          (text.length < 200 ? `: ${text}` : ' (HTML error page — check server logs)')
+          (text.length < 200 ? `: ${text}` : ' (HTML error page \u2014 check server logs)')
         );
       }
       if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
@@ -687,7 +699,10 @@
       currentJobId = jobId;
       saveActiveJob(jobId);
     } catch(e) {
-      showError('Generation failed', e.message);
+      let msg = e.message;
+      if (e.name === 'AbortError') msg = 'Upload timed out (>2 min). Try a smaller file or check your connection.';
+      else if (msg === 'Failed to fetch') msg = 'Network error \u2014 could not reach the server. Check your internet connection and try again.';
+      showError('Generation failed', msg);
       btn.disabled = false;
       document.getElementById('upload-card').style.opacity = '1';
       document.getElementById('progress-card').style.display = 'none';
