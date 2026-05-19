@@ -72,7 +72,7 @@ def validate_chapter(text: str, label: str = "") -> ValidationResult:
         "Learning Objectives": r"(?i)learning\s+objectives?|objectives?\s+and\s+outcomes?",
         "Core Concepts": r"(?i)core\s+concepts?|key\s+concepts?|concepts?\s+[&and]\s+theory|theory",
         "Worked Examples": r"(?i)worked?\s+examples?|example|practical\s+examples?",
-        "Practice Exercises": r"(?i)practice\s+exercises?|exercises?|practice\s+problems?|problems?",
+        "Practice Exercises": r"(?i)##\s*\d*\.?\s*(?:practice\s+exercises?|exercises?|practice\s+problems?)",
         "Mini Project": r"(?i)mini\s+projects?|projects?|capstone|hands.?on",
         "Chapter Quiz": r"(?i)chapters?\s+quizzes?|chapter\s+test|assessment|quiz",
         "Reflection": r"(?i)reflections?|self.?assessment|reflection\s+questions?",

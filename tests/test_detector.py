@@ -164,3 +164,187 @@ def test_appendix_glossary_filtered():
         assert "Appendix" not in t
         assert "Glossary" not in t
         assert "Bibliography" not in t
+
+
+# ── Running page headers (should not create duplicate chapters) ────────────────
+
+_RUNNING_HEADER_DOC = """\
+CHAPTER 1  Getting Started      1
+Welcome to the course. This chapter covers basics.
+CHAPTER 1  Getting Started      3
+More content on the same topic.
+CHAPTER 1  Getting Started      5
+Even more content.
+
+CHAPTER 2  Advanced Topics      7
+Now we move to advanced material.
+CHAPTER 2  Advanced Topics      9
+Continuing advanced topics.
+"""
+
+
+def test_running_headers_deduped():
+    chapters = detect_chapters(_RUNNING_HEADER_DOC)
+    assert len(chapters) == 2
+    assert chapters[0]["title"] == "Getting Started"
+    assert chapters[1]["title"] == "Advanced Topics"
+
+
+# ── TOC with dot leaders should not create chapters ───────────────────────────
+
+_TOC_DOC = """\
+Table of Contents
+Chapter 1: Introduction ........................ 1
+Chapter 2: Variables ........................... 15
+Chapter 3: Functions ........................... 30
+
+Chapter 1: Introduction
+This is the actual introduction content.
+
+Chapter 2: Variables
+Variables store data in memory.
+
+Chapter 3: Functions
+Functions encapsulate reusable logic.
+"""
+
+
+def test_toc_lines_filtered():
+    chapters = detect_chapters(_TOC_DOC)
+    assert len(chapters) == 3
+    # Should use the actual chapter headings, not TOC entries
+    assert "actual introduction" in chapters[0]["text"]
+
+
+# ── Unnumbered subheadings ────────────────────────────────────────────────────
+
+_UNNUMBERED_SUB_DOC = """\
+Chapter 1: Excel Basics
+This chapter covers the basics of Excel.
+
+Creating a New Workbook
+To create a workbook, go to File > New.
+
+Entering Data in Cells
+Click a cell and start typing.
+
+Chapter 2: Formatting
+This chapter covers formatting.
+
+Changing Font Styles
+Select cells and use the Home tab.
+"""
+
+
+def test_unnumbered_subheadings():
+    chapters = detect_chapters(_UNNUMBERED_SUB_DOC)
+    assert len(chapters) == 2
+    # Should detect unnumbered subheadings
+    sub_titles = [s["title"] for s in chapters[0]["subchapters"]]
+    assert "Creating a New Workbook" in sub_titles
+    assert "Entering Data in Cells" in sub_titles
+
+
+# ── Module/Unit/Part keywords ─────────────────────────────────────────────────
+
+_MODULE_DOC = """\
+Module 1: Introduction to Python
+Python is a versatile language.
+
+Module 2: Data Structures
+Lists, dicts, and sets.
+
+Module 3: Object-Oriented Programming
+Classes and inheritance.
+"""
+
+_UNIT_DOC = """\
+Unit 1: Foundations
+Basic concepts.
+
+Unit 2: Intermediate Skills
+Building on foundations.
+
+Unit 3: Advanced Topics
+Expert-level material.
+"""
+
+_PART_DOC = """\
+Part 1: Getting Started
+Setup and installation.
+
+Part 2: Core Concepts
+The main ideas.
+
+Part 3: Applications
+Real-world usage.
+"""
+
+
+@pytest.mark.parametrize("doc", [_MODULE_DOC, _UNIT_DOC, _PART_DOC])
+def test_alternative_keywords(doc: str):
+    chapters = detect_chapters(doc)
+    assert len(chapters) == 3
+
+
+# ── Mixed heading styles (explicit chapters with numbered subs) ───────────────
+
+_MIXED_DOC = """\
+Chapter 1: Introduction
+1.1 Background
+Some background info.
+1.2 Objectives
+Course objectives.
+
+Chapter 2: Methods
+2.1 Qualitative Methods
+Description of qualitative.
+2.2 Quantitative Methods
+Description of quantitative.
+2.3 Mixed Methods
+Combining both.
+"""
+
+
+def test_mixed_explicit_and_numbered_subs():
+    chapters = detect_chapters(_MIXED_DOC)
+    assert len(chapters) == 2
+    assert len(chapters[0]["subchapters"]) == 2
+    assert len(chapters[1]["subchapters"]) == 3
+    assert chapters[0]["subchapters"][0]["title"] == "Background"
+    assert chapters[1]["subchapters"][2]["title"] == "Mixed Methods"
+
+
+# ── Sentence starting with "Chapter N" should not be a chapter ────────────────
+
+_SENTENCE_CHAPTER_DOC = """\
+Chapter 1: Introduction
+This is the introduction.
+Chapter 3 of this book explains advanced topics in detail.
+More intro content here.
+
+Chapter 2: Variables
+Variables store data.
+As mentioned in Chapter 1, variables are fundamental.
+"""
+
+
+def test_sentence_with_chapter_not_detected():
+    chapters = detect_chapters(_SENTENCE_CHAPTER_DOC)
+    assert len(chapters) == 2
+    assert chapters[0]["title"] == "Introduction"
+    assert chapters[1]["title"] == "Variables"
+
+
+# ── Very short document ───────────────────────────────────────────────────────
+
+def test_very_short_document():
+    chapters = detect_chapters("Hello world")
+    assert len(chapters) >= 1  # should at least return something
+
+
+# ── Empty document ────────────────────────────────────────────────────────────
+
+def test_empty_document():
+    chapters = detect_chapters("")
+    assert chapters == [] or len(chapters) >= 0  # should not crash

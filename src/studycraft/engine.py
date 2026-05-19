@@ -149,19 +149,17 @@ class StudyCraft:
         doc_subject = opts.subject or _infer_subject(doc_path, raw_text)
         console.print(f"[bold cyan]Subject:[/bold cyan] {doc_subject}")
 
-        # 3. Detect chapters
+        # 3. Detect chapters (pre-index into RAG for AI fallback)
         console.print("[cyan]Detecting chapters...[/cyan]")
-        chapters = detect_chapters(raw_text, llm_client=self.client)
+        self.rag.clear()
+        self.rag.index(raw_text, source_name=doc_path.stem)
+        chapters = detect_chapters(raw_text, llm_client=self.client, rag_index=self.rag)
         if not chapters:
             raise ValueError("Could not detect any chapters. Check the document format.")
 
         console.print(f"\n[bold]Outline:[/bold]\n{chapters_to_outline(chapters)}\n")
 
-        # 4. Index into RAG (clear old index so this doc is isolated)
-        self.rag.clear()
-        self.rag.index(raw_text, source_name=doc_path.stem)
-
-        # 4b. Index supplementary context files
+        # 4. Index supplementary context files into RAG
         for ctx_path in opts.context_files or []:
             ctx_path = Path(ctx_path)
             try:
